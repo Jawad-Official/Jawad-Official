@@ -17,10 +17,12 @@
 @keyframes gy{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 </style>
 <defs></defs>
+<g transform="translate(0,0)">
 <rect x="1" y="1" width="198" height="44" rx="10" fill="#080b10" stroke="#263243"/>
 <path d="M5,15 V5 H15" fill="none" stroke="#3ee6c1" stroke-width="1.5"/>
 <path d="M195,31 V41 H185" fill="none" stroke="#3ee6c1" stroke-width="1.5"/>
 <text x="20" y="28" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="9.5" fill="#4f5b6b">01</text>
 <text x="44" y="28" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="12" letter-spacing="1.6" fill="#e8edf2">PORTFOLIO</text>
 <text x="180" y="28" text-anchor="end" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="13" fill="#3ee6c1">↗</text>
+</g>
 </svg>
