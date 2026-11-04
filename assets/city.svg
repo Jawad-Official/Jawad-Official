@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="474" viewBox="0 0 880 474" role="img" aria-label="Contribution city: 492 contributions in the last year">
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="418" viewBox="0 0 880 418" role="img" aria-label="Contribution city: 492 contributions in the last year">
 <title>Contribution city: 492 contributions in the last year</title>
 <style>
 .fu{animation:fu .9s cubic-bezier(.2,.8,.2,1) both}
@@ -17,7 +17,7 @@
 @keyframes gy{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 @keyframes ok21{from{transform:translateY(0)}to{transform:translateY(-672.0px)}}@keyframes ok23{from{transform:translateY(0)}to{transform:translateY(-912.0px)}}@keyframes ok25{from{transform:translateY(0)}to{transform:translateY(-576.0px)}}.sh{opacity:0;animation:sh 9.0s ease-out infinite}@keyframes sh{0%{opacity:0}2%{opacity:.75}9%{opacity:0}100%{opacity:0}}.win{animation:win 4s steps(1) infinite}@keyframes win{0%{opacity:.95}35%{opacity:.2}50%{opacity:.95}78%{opacity:.45}}.pt{transform-box:fill-box;animation:pt 3.6s ease-out infinite}@keyframes pt{0%{transform:translateY(0);opacity:0}15%{opacity:1}100%{transform:translateY(-38px);opacity:0}}.beam{opacity:0;animation:beam 9.0s linear 2.6s infinite}@keyframes beam{0%{transform:translate(-18.6px,5.7px);opacity:0}6%{opacity:1}92%{opacity:1}100%{transform:translate(511.5px,-156.8px);opacity:0}}</style>
 <defs><pattern id="dots19" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".8" fill="#ffffff" fill-opacity=".05"/></pattern><clipPath id="oc20"><rect x="39.0" y="102.0" width="26.0" height="48.0"/></clipPath><clipPath id="oc22"><rect x="63.0" y="102.0" width="26.0" height="48.0"/></clipPath><clipPath id="oc24"><rect x="87.0" y="102.0" width="26.0" height="48.0"/></clipPath><linearGradient id="beam26" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3ee6c1" stop-opacity="0"/><stop offset="1" stop-color="#3ee6c1" stop-opacity=".22"/></linearGradient></defs>
-<g transform="translate(0,22)">
+<g transform="translate(0,-6)">
 <rect x="10" y="10" width="860" height="410" rx="14" fill="#080b10" stroke="#263243"/>
 <rect x="10" y="10" width="860" height="410" rx="14" fill="url(#dots19)"/>
 <path d="M14,28 V14 H28" fill="none" stroke="#3ee6c1" stroke-width="1.6" stroke-opacity=".8"/>
