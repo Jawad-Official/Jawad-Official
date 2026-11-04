@@ -39,10 +39,13 @@ INK = "#e8edf2"
 DIM = "#8794a5"
 FAINT = "#4f5b6b"
 ACC = "#3ee6c1"   # mint accent
+MINT = "#a5fbe6"
 WARM = "#ffb454"  # award / peak
 LIVE = "#4ade80"
 SANS = "-apple-system, 'Segoe UI', Ubuntu, 'Helvetica Neue', Arial, sans-serif"
 MONO = "'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
+
+PAD = 22  # transparent space above and below each card
 
 CITY_LEVELS = ["#11242c", "#0e5a50", "#119482", "#22c7a6", "#7ff5d8"]
 
@@ -302,8 +305,8 @@ class Svg:
 
     _uid = 0
 
-    def __init__(self, w: int, h: int, title: str):
-        self.w, self.h, self.title = w, h, title
+    def __init__(self, w: int, h: int, title: str, pad: int = 0):
+        self.w, self.h, self.title, self.pad = w, h, title, pad
         self.css = [BASE_CSS]
         self.defs: list[str] = []
         self.body: list[str] = []
@@ -316,11 +319,14 @@ class Svg:
         self.body.extend(parts)
 
     def render(self) -> str:
+        # Transparent margin above and below so stacked cards breathe in the README.
+        h = self.h + 2 * self.pad
         return (
-            f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.w}" height="{self.h}" '
-            f'viewBox="0 0 {self.w} {self.h}" role="img" aria-label="{esc(self.title)}">\n'
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.w}" height="{h}" '
+            f'viewBox="0 0 {self.w} {h}" role="img" aria-label="{esc(self.title)}">\n'
             f"<title>{esc(self.title)}</title>\n<style>{''.join(self.css)}</style>\n"
-            f"<defs>{''.join(self.defs)}</defs>\n" + "\n".join(self.body) + "\n</svg>\n"
+            f"<defs>{''.join(self.defs)}</defs>\n"
+            f'<g transform="translate(0,{self.pad})">\n' + "\n".join(self.body) + "\n</g>\n</svg>\n"
         )
 
     # -------- shared pieces
@@ -372,7 +378,7 @@ def render_header(cfg: dict, data: dict) -> str:
     days = data["days"]
     total = sum(d["count"] for d in days)
     active = sum(1 for d in days if d["count"])
-    s = Svg(W, H, f"{cfg['name']}, {cfg.get('role', '')}")
+    s = Svg(W, H, f"{cfg['name']}, {cfg.get('role', '')}", PAD)
     s.card(X0, Y0, CW, CH)
 
     # ---- top strip
@@ -532,7 +538,7 @@ def render_city(cfg: dict, data: dict) -> str:
     peak = max(days, key=lambda d: d["count"]) if days else {"count": 0, "date": date.today().isoformat()}
     cur, longest = streaks(days)
     nweeks_all = max(1, math.ceil(len(days) / 7))
-    s = Svg(W, H, f"Contribution city: {total} contributions in the last year")
+    s = Svg(W, H, f"Contribution city: {total} contributions in the last year", PAD)
     s.card(X0, Y0, CW, CH)
     s.heading(40, 42, "FIG. 1", "Contribution city", "LAST 365 DAYS  ·  HEIGHT ∝ √CONTRIBUTIONS", X0 + CW - 26)
     s.hline(X0 + 1, X0 + CW - 1, 60)
@@ -600,8 +606,23 @@ def render_city(cfg: dict, data: dict) -> str:
 
     cells = [(wi, d["weekday"], d["count"], d["date"]) for wi, wd_ in weeks.items() for d in wd_]
     cells.sort(key=lambda c: (c[1] - c[0], c[1]))
-    s.css.append(".sh{opacity:0;animation:sh 7s ease-in-out infinite}@keyframes sh{0%,100%{opacity:0}6%{opacity:.55}14%{opacity:0}}")
+    peak_cell = next(((c[0], c[1]) for c in cells if c[3] == peak["date"]), None)
+    T, T0 = 9.0, 2.6  # sweep period and start (after the towers have risen)
+    s.css.append(f".sh{{opacity:0;animation:sh {T}s ease-out infinite}}"
+                 "@keyframes sh{0%{opacity:0}2%{opacity:.75}9%{opacity:0}100%{opacity:0}}"
+                 ".win{animation:win 4s steps(1) infinite}"
+                 "@keyframes win{0%{opacity:.95}35%{opacity:.2}50%{opacity:.95}78%{opacity:.45}}"
+                 ".pt{transform-box:fill-box;animation:pt 3.6s ease-out infinite}"
+                 "@keyframes pt{0%{transform:translateY(0);opacity:0}15%{opacity:1}100%{transform:translateY(-38px);opacity:0}}")
+    rng = random.Random(5)
+    span = nweeks + 4
+
+    def sweep_delay(w: float) -> float:
+        return T0 + (w + 2) / span * T
+
     gap = .13
+    tallest = sorted((c for c in cells if c[2]), key=lambda c: -c[2])[:12]
+    sparks = {(c[0], c[1]) for c in tallest}
     peak_roof = None
     last_date = days[-1]["date"] if days else ""
     beacon = None
@@ -621,16 +642,47 @@ def render_city(cfg: dict, data: dict) -> str:
         h = 3 + top_h * ratio
         up = lambda p: (p[0], p[1] - h)
         roof = [up(p1), up(p2), up(p3), up(p4)]
+        # lit windows on the front face of taller towers
+        wins = []
+        if h >= 16:
+            for k in range(min(6, int((h - 6) / 9))):
+                for sx in (.3, .7):
+                    if rng.random() < .55:
+                        wx = p4[0] + sx * (p3[0] - p4[0])
+                        wy = p4[1] + sx * (p3[1] - p4[1]) - 7 - k * 9
+                        wins.append(f'<rect class="win" style="animation-duration:{rng.uniform(2.5, 6.5):.1f}s;animation-delay:{rng.uniform(0, 4):.1f}s" '
+                                    f'x="{wx - 1:.1f}" y="{wy - .8:.1f}" width="2" height="1.6" fill="#fff1c1"/>')
         s.add(f'<g class="gy" style="animation-delay:{.2 + w * .022:.2f}s">'
               + poly([p1, p4, up(p4), up(p1)], shade(top, .5))
               + poly([p4, p3, up(p3), up(p4)], shade(top, .72))
               + poly(roof, top)
-              + poly(roof, "#ffffff", f' class="sh" style="animation-delay:{2.5 + w * .045:.2f}s"')
+              + "".join(wins)
+              + poly(roof, "#ffffff", f' class="sh" style="animation-delay:{sweep_delay(w):.2f}s"')
               + "</g>")
+        if (w, d) in sparks:
+            rx_, ry_ = (roof[0][0] + roof[2][0]) / 2, (roof[0][1] + roof[2][1]) / 2
+            for _ in range(2):
+                s.add(f'<circle class="pt" style="animation-delay:{T0 + rng.uniform(0, 4):.1f}s;animation-duration:{rng.uniform(2.8, 4.6):.1f}s" '
+                      f'cx="{rx_ + rng.uniform(-3, 3):.1f}" cy="{ry_:.1f}" r="1.3" fill="{"#ffd28a" if (w, d) == peak_cell else MINT}"/>')
         if is_peak:
             peak_roof = ((roof[0][0] + roof[2][0]) / 2, (roof[0][1] + roof[2][1]) / 2)
         if ds == last_date:
             beacon = ((roof[0][0] + roof[2][0]) / 2, (roof[0][1] + roof[2][1]) / 2)
+
+    # scanning beam that sweeps the city; roofs flash as it passes
+    bid = s.uid("beam")
+    s.defs.append(f'<linearGradient id="{bid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{ACC}" stop-opacity="0"/>'
+                  f'<stop offset="1" stop-color="{ACC}" stop-opacity=".22"/></linearGradient>')
+    a0, a1 = P(0, -.8), P(0, 7.8)
+    sheet = [(a0[0], a0[1] - 120), (a1[0], a1[1] - 120), a1, a0]
+    floor_glow = [P(-.6, -.8), P(.6, -.8), P(.6, 7.8), P(-.6, 7.8)]
+    dx0, dy0 = -2 * ux, -2 * uy
+    dx1, dy1 = (nweeks + 2) * ux, (nweeks + 2) * uy
+    s.css.append(f".beam{{opacity:0;animation:beam {T}s linear {T0}s infinite}}"
+                 f"@keyframes beam{{0%{{transform:translate({dx0:.1f}px,{dy0:.1f}px);opacity:0}}6%{{opacity:1}}"
+                 f"92%{{opacity:1}}100%{{transform:translate({dx1:.1f}px,{dy1:.1f}px);opacity:0}}}}")
+    s.add(f'<g class="beam">{poly(sheet, f"url(#{bid})")}{poly(floor_glow, ACC, " fill-opacity=" + chr(34) + ".16" + chr(34))}'
+          f'<path d="M{a0[0]:.1f},{a0[1]:.1f} L{a1[0]:.1f},{a1[1]:.1f}" stroke="{ACC}" stroke-opacity=".7"/></g>')
 
     if peak_roof:
         px_, py_ = peak_roof
@@ -660,10 +712,10 @@ def render_city(cfg: dict, data: dict) -> str:
 # ------------------------------------------------------------------ panels
 def render_panels(cfg: dict, data: dict) -> str:
     W, H = 880, 430
-    s = Svg(W, H, "Language stack and selected work")
+    s = Svg(W, H, "Language stack and selected work", PAD)
 
     # ---- language stack card
-    X0, Y0, LW, CH = 10, 10, 296, 410
+    X0, Y0, LW, CH = 10, 10, 292, 410
     s.card(X0, Y0, LW, CH)
     s.heading(X0 + 26, 42, "FIG. 2", "Language stack")
     s.hline(X0 + 1, X0 + LW - 1, 60)
@@ -699,13 +751,13 @@ def render_panels(cfg: dict, data: dict) -> str:
         s.add(f'<text x="{bx}" y="{Y0 + CH - 16}" font-family="{MONO}" font-size="8.5" fill="{FAINT}">markup &amp; config excluded</text>')
 
     # ---- selected work card
-    PX = X0 + LW + 18
+    PX = X0 + LW + 24
     PW = W - 10 - PX
     s.card(PX, Y0, PW, CH)
     s.heading(PX + 26, 42, "TABLE 1", "Selected work", "./projects.sh --featured", PX + PW - 26)
     s.hline(PX + 1, PX + PW - 1, 60)
 
-    gap = 16
+    gap = 20
     cw = (PW - 52 - gap) / 2
     chh = (CH - 50 - 26 - gap) / 2
     for i, p in enumerate(data["featured"][:4]):
@@ -767,14 +819,16 @@ def main() -> None:
             sys.exit("Set GH_TOKEN (or run with --demo).")
         data = fetch_live(cfg, token)
 
-    ASSETS.mkdir(exist_ok=True)
+    # Demo output never goes to assets/, so sample numbers cannot reach the profile.
+    out_dir = ROOT / "preview" if args.demo else ASSETS
+    out_dir.mkdir(exist_ok=True)
     outputs = {"header.svg": render_header(cfg, data), "city.svg": render_city(cfg, data),
                "panels.svg": render_panels(cfg, data)}
     for i, link in enumerate(cfg.get("links", []), 1):
         outputs[f"btn-{link['label'].lower()}.svg"] = render_button(link["label"], i)
     for name, svg in outputs.items():
-        (ASSETS / name).write_text(svg, encoding="utf-8")
-        print(f"wrote assets/{name}")
+        (out_dir / name).write_text(svg, encoding="utf-8")
+        print(f"wrote {out_dir.name}/{name}")
 
 
 if __name__ == "__main__":

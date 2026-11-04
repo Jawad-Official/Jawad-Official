@@ -91,7 +91,7 @@ python scripts/make_avatar.py
 python scripts/generate.py --demo
 ```
 
-Renders with sample data, no token needed. Open the SVGs in a browser.
+Renders with sample data, no token needed, into `preview/` (git-ignored). Sample numbers never touch `assets/`, so they cannot reach your profile.
 
 With live data:
 
