@@ -342,9 +342,9 @@ class Svg:
             f'<circle cx="1" cy="1" r=".8" fill="#ffffff" fill-opacity=".05"/></pattern>')
         self.add(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="14" fill="{BG0}" stroke="{LINE2}"/>',
                  f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="14" fill="url(#{pid})"/>')
-        k = 14
+        k, inset = 12, 10  # corner brackets sit 10 px inside the card edge
         for cx, cy, sx, sy in [(x, y, 1, 1), (x + w, y, -1, 1), (x, y + h, 1, -1), (x + w, y + h, -1, -1)]:
-            self.add(f'<path d="M{cx + sx * 4},{cy + sy * (k + 4)} V{cy + sy * 4} H{cx + sx * (k + 4)}" '
+            self.add(f'<path d="M{cx + sx * inset},{cy + sy * (k + inset)} V{cy + sy * inset} H{cx + sx * (k + inset)}" '
                      f'fill="none" stroke="{ACC}" stroke-width="1.6" stroke-opacity=".8"/>')
 
     def heading(self, x, y, fig: str, title: str, right: str = "", right_x: float | None = None) -> None:
@@ -387,10 +387,10 @@ def render_header(cfg: dict, data: dict) -> str:
     s.card(X0, Y0, CW, CH)
 
     # ---- top strip
-    s.add(f'<circle class="ring" cx="{IN_L + 4}" cy="31" r="3.5" fill="none" stroke="{ACC}"/>',
-          f'<circle cx="{IN_L + 4}" cy="31" r="3.5" fill="{ACC}"/>',
-          f'<text x="{IN_L + 16}" y="35" font-family="{MONO}" font-size="10" letter-spacing="1.6" fill="{ACC}">LIVE</text>',
-          f'<text x="{IN_L + 54}" y="35" font-family="{MONO}" font-size="10" letter-spacing=".6" fill="{DIM}">{esc(cfg["username"].lower())} / profile.readme</text>')
+    s.add(f'<circle class="ring" cx="{IN_L + 6}" cy="31" r="3.5" fill="none" stroke="{ACC}"/>',
+          f'<circle cx="{IN_L + 6}" cy="31" r="3.5" fill="{ACC}"/>',
+          f'<text x="{IN_L + 18}" y="35" font-family="{MONO}" font-size="10" letter-spacing="1.6" fill="{ACC}">LIVE</text>',
+          f'<text x="{IN_L + 56}" y="35" font-family="{MONO}" font-size="10" letter-spacing=".6" fill="{DIM}">{esc(cfg["username"].lower())} / profile.readme</text>')
     right = f'{esc(cfg.get("coords", ""))}  ·  {esc(cfg.get("location", "").upper())}  ·  SYNCED {date.today():%d %b %Y}'.upper()
     s.add(f'<text x="{IN_R}" y="35" text-anchor="end" font-family="{MONO}" font-size="10" letter-spacing=".6" fill="{DIM}">{right}</text>')
     s.hline(X0 + 1, X0 + CW - 1, 50)
@@ -470,18 +470,18 @@ def render_header(cfg: dict, data: dict) -> str:
     return s.render()
 
 
-def png_rgb(width: int, height: int, rows: list[bytes]) -> bytes:
-    """Minimal PNG encoder (8-bit RGB) so the Action needs no Pillow."""
+def png_rgba(width: int, height: int, rows: list[bytes]) -> bytes:
+    """Minimal PNG encoder (8-bit RGBA) so the Action needs no Pillow."""
     def chunk(tag: bytes, data: bytes) -> bytes:
         return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
     raw = b"".join(b"\x00" + r for r in rows)
-    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
             + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
 
 def render_portrait(s: Svg, x0: float, y0: float, w: float, h: float) -> str:
-    """LED dot-matrix portrait: every cell is a dot, empty cells glow dimly, stars twinkle."""
-    out = [f'<rect x="{x0}" y="{y0}" width="{w}" height="{h}" rx="10" fill="#070a10" stroke="{LINE2}"/>',
+    """LED dot-matrix portrait on a dark, starry frame. Only the figure is lit; stars drift behind it."""
+    out = [f'<rect x="{x0}" y="{y0}" width="{w}" height="{h}" rx="10" fill="#06080d" stroke="{LINE2}"/>',
            f'<text x="{x0 + 12}" y="{y0 + 18}" font-family="{MONO}" font-size="8.5" letter-spacing="1.4" fill="{FAINT}">FIG. 0 — PORTRAIT</text>']
     path = ROOT / "avatar" / "pixels.json"
     if not path.exists():
@@ -494,74 +494,60 @@ def render_portrait(s: Svg, x0: float, y0: float, w: float, h: float) -> str:
     rows = max(prow, int((h - 36) / cell))
     mh = rows * cell
     my = y0 + h - 8 - mh
-    off = rows - prow  # portrait sits on the bottom edge; empty rows above
-    out.append(f'<text x="{x0 + w - 12}" y="{y0 + 18}" text-anchor="end" font-family="{MONO}" font-size="8.5" fill="{FAINT}">{cols}×{rows} LED</text>')
+    off = rows - prow  # figure sits on the bottom edge
+    out.append(f'<text x="{x0 + w - 12}" y="{y0 + 18}" text-anchor="end" font-family="{MONO}" font-size="8.5" fill="{FAINT}">{cols}×{prow} LED</text>')
 
-    def colour(r: int, c: int) -> str | None:
-        return px[r - off][c] if r >= off else None
+    # ---- stars drifting slowly behind the figure
+    frame_clip = s.uid("fc")
+    s.defs.append(f'<clipPath id="{frame_clip}"><rect x="{x0 + 1}" y="{y0 + 26}" width="{w - 2}" height="{h - 27}" rx="9"/></clipPath>')
+    rng = random.Random(23)
+    palette = ["#ffffff", "#ffffff", "#ffd36e", "#7ab8ff", "#ff9fcb", ACC, "#c39bff"]
+    drifts = [(-34, 10), (-26, -8), (-40, 4), (-20, 14)]
+    for k, (dx, dy) in enumerate(drifts):
+        s.css.append(f"@keyframes dr{k}{{0%{{transform:translate(0,0);opacity:0}}12%{{opacity:1}}88%{{opacity:1}}"
+                     f"100%{{transform:translate({dx}px,{dy}px);opacity:0}}}}")
+    s.css.append(".tw{animation:tw 3s ease-in-out infinite}@keyframes tw{0%,100%{opacity:.25}50%{opacity:1}}")
+    stars = []
+    for n in range(30):
+        sx = rng.uniform(x0 + 10, x0 + w - 6)
+        sy = rng.uniform(y0 + 30, y0 + h - 10)
+        col = rng.choice(palette)
+        dur = rng.uniform(16, 30)
+        drift = f"animation:dr{rng.randrange(len(drifts))} {dur:.1f}s linear -{rng.uniform(0, dur):.1f}s infinite"
+        tw_ = f"animation-duration:{rng.uniform(2, 4.5):.1f}s;animation-delay:-{rng.uniform(0, 4):.1f}s"
+        if n < 5:  # a few four-point sparkles
+            r = rng.uniform(2.6, 3.6)
+            shape = (f'<path d="M{sx:.1f},{sy - r:.1f} Q{sx:.1f},{sy:.1f} {sx + r:.1f},{sy:.1f} Q{sx:.1f},{sy:.1f} {sx:.1f},{sy + r:.1f} '
+                     f'Q{sx:.1f},{sy:.1f} {sx - r:.1f},{sy:.1f} Q{sx:.1f},{sy:.1f} {sx:.1f},{sy - r:.1f}Z" fill="{col}"/>')
+        else:
+            shape = f'<circle cx="{sx:.1f}" cy="{sy:.1f}" r="{rng.uniform(.5, 1.1):.2f}" fill="{col}"/>'
+        stars.append(f'<g style="{drift}"><g class="tw" style="{tw_}">{shape}</g></g>')
+    out.append(f'<g clip-path="url(#{frame_clip})">{"".join(stars)}</g>')
 
-    # the whole matrix as a tiny PNG, one pixel per dot
-    bg = (0x14, 0x1c, 0x2e)
+    # ---- the figure: one PNG pixel per LED, transparent where empty, shown through a dot mask
     png_rows = []
     for r in range(rows):
         line = bytearray()
         for c in range(cols):
-            col = colour(r, c)
-            line += bytes(int(col[i:i + 2], 16) for i in (1, 3, 5)) if col else bytes(bg)
+            col = px[r - off][c] if r >= off else None
+            line += bytes(int(col[i:i + 2], 16) for i in (1, 3, 5)) + b"\xff" if col else b"\x00\x00\x00\x00"
         png_rows.append(bytes(line))
-    b64 = base64.b64encode(png_rgb(cols, rows, png_rows)).decode()
+    b64 = base64.b64encode(png_rgba(cols, rows, png_rows)).decode()
 
-    pat, mask, rv = s.uid("ledp"), s.uid("ledm"), s.uid("ledr")
+    pat, mask = s.uid("ledp"), s.uid("ledm")
     s.defs.append(f'<pattern id="{pat}" x="{mx:.2f}" y="{my:.2f}" width="{cell:.3f}" height="{cell:.3f}" patternUnits="userSpaceOnUse">'
-                  f'<circle cx="{cell / 2:.3f}" cy="{cell / 2:.3f}" r="{cell * .41:.3f}" fill="#fff"/></pattern>'
+                  f'<circle cx="{cell / 2:.3f}" cy="{cell / 2:.3f}" r="{cell * .42:.3f}" fill="#fff"/></pattern>'
                   f'<mask id="{mask}" maskUnits="userSpaceOnUse" x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{mh:.2f}">'
-                  f'<rect x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{mh:.2f}" fill="url(#{pat})"/></mask>'
-                  f'<clipPath id="{rv}"><rect class="rv" x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{mh:.2f}"/></clipPath>')
-    s.css.append(f".rv{{transform-box:fill-box;transform-origin:50% 0;animation:rv 1.8s steps({rows}) .2s both}}"
-                 "@keyframes rv{from{transform:scaleY(0)}to{transform:scaleY(1)}}"
-                 f".head{{opacity:0;animation:head 1.8s steps({rows}) .2s both}}"
-                 f"@keyframes head{{0%{{opacity:1;transform:translateY(0)}}99%{{opacity:1}}100%{{opacity:0;transform:translateY({mh:.1f}px)}}}}"
-                 f".sweep{{opacity:0;animation:sweep 7s linear 3s infinite}}"
-                 f"@keyframes sweep{{0%{{opacity:.3;transform:translateY(0)}}40%{{opacity:.3;transform:translateY({mh:.1f}px)}}41%,100%{{opacity:0}}}}"
-                 ".tw{animation:tw 3s ease-in-out infinite}@keyframes tw{0%,100%{opacity:.12}50%{opacity:1}}"
-                 ".bl{opacity:0;animation:bl 5.5s steps(1) 2.6s infinite}@keyframes bl{0%{opacity:0}94%{opacity:1}97%{opacity:0}}")
-
+                  f'<rect x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{mh:.2f}" fill="url(#{pat})"/></mask>')
+    s.css.append(".fig{animation:fig 1.4s ease-out .2s both}@keyframes fig{from{opacity:0}to{opacity:1}}"
+                 ".bl{opacity:0;animation:bl 5.5s steps(1) 2.4s infinite}@keyframes bl{0%{opacity:0}94%{opacity:1}97%{opacity:0}}")
     layer = [f'<image href="data:image/png;base64,{b64}" x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{mh:.2f}" '
              f'preserveAspectRatio="none" style="image-rendering:pixelated;image-rendering:crisp-edges"/>']
-
-    def cell_rect(r, c, fill, extra=""):
-        return f'<rect x="{mx + c * cell:.2f}" y="{my + r * cell:.2f}" width="{cell:.3f}" height="{cell:.3f}" fill="{fill}"{extra}/>'
-
-    # twinkling stars in the empty sky, away from the portrait edge
-    rng = random.Random(17)
-    palette = ["#ff7ab6", "#7ab8ff", "#ffd36e", "#ffffff", ACC, "#c39bff"]
-    def free(r, c, pad=1):
-        return all(0 <= rr < rows and 0 <= cc < cols and colour(rr, cc) is None
-                   for rr in range(r - pad, r + pad + 1) for cc in range(c - pad, c + pad + 1))
-    singles, sparkles = 0, 0
-    for _ in range(600):
-        if singles >= 26 and sparkles >= 4:
-            break
-        r, c = rng.randrange(1, rows - 1), rng.randrange(1, cols - 1)
-        col = rng.choice(palette)
-        style = f' class="tw" style="animation-duration:{rng.uniform(2, 5):.1f}s;animation-delay:{rng.uniform(0, 4):.1f}s"'
-        if sparkles < 4 and free(r, c, 2) and 2 <= r < rows - 2 and 2 <= c < cols - 2:
-            arms = "".join(cell_rect(r + dr, c + dc, col, ' fill-opacity=".55"') for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)))
-            layer.append(f'<g{style}>{cell_rect(r, c, "#ffffff")}{arms}</g>')
-            sparkles += 1
-        elif singles < 26 and free(r, c):
-            layer.append(cell_rect(r, c, col, style))
-            singles += 1
-
-    # blink: eyelid-coloured cells flash over the eyes every few seconds
-    if av.get("blink"):
-        layer.append('<g class="bl">' + "".join(cell_rect(r + off, c, colr) for r, c, colr in av["blink"]) + "</g>")
-
-    # print head during the reveal, then a slow light sweep
-    layer.append(f'<rect class="head" x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{cell:.3f}" fill="{MINT}"/>')
-    layer.append(f'<rect class="sweep" x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{cell:.3f}" fill="{MINT}"/>')
-
-    out.append(f'<g clip-path="url(#{rv})"><g mask="url(#{mask})">' + "".join(layer) + "</g></g>")
+    if av.get("blink"):  # eyelid-coloured LEDs flash over the eyes every few seconds
+        layer.append('<g class="bl">' + "".join(
+            f'<rect x="{mx + c * cell:.2f}" y="{my + (r + off) * cell:.2f}" width="{cell:.3f}" height="{cell:.3f}" fill="{colr}"/>'
+            for r, c, colr in av["blink"]) + "</g>")
+    out.append(f'<g class="fig" mask="url(#{mask})">' + "".join(layer) + "</g>")
     return "\n".join(out)
 
 
@@ -804,7 +790,7 @@ def render_panels(cfg: dict, data: dict) -> str:
     s.hline(PX + 1, PX + PW - 1, 60)
 
     gap = 10
-    top, bottom = 80, Y0 + CH - 20  # 20 px under the heading rule, 20 px above the card edge
+    top, bottom = 80, Y0 + CH - 30  # 20 px under the heading rule, 30 px above the card edge (same as the sides)
     cw = (PW - 60 - gap) / 2
     chh = (bottom - top - gap) / 2
     for i, p in enumerate(data["featured"][:4]):
@@ -849,8 +835,8 @@ def render_button(label: str, idx: int, n: int) -> str:
     y, bh = 6, 42
     s = Svg(round(W), H, label.title())
     s.add(f'<rect x="{x:.1f}" y="{y}" width="{bw:.1f}" height="{bh}" rx="10" fill="{BG0}" stroke="{LINE2}"/>',
-          f'<path d="M{x + 4:.1f},{y + 14} V{y + 4} H{x + 14:.1f}" fill="none" stroke="{ACC}" stroke-width="1.5"/>',
-          f'<path d="M{x + bw - 4:.1f},{y + bh - 14} V{y + bh - 4} H{x + bw - 14:.1f}" fill="none" stroke="{ACC}" stroke-width="1.5"/>',
+          f'<path d="M{x + 7:.1f},{y + 17} V{y + 7} H{x + 17:.1f}" fill="none" stroke="{ACC}" stroke-width="1.5"/>',
+          f'<path d="M{x + bw - 7:.1f},{y + bh - 17} V{y + bh - 7} H{x + bw - 17:.1f}" fill="none" stroke="{ACC}" stroke-width="1.5"/>',
           f'<text x="{x + 20:.1f}" y="{y + 25}" font-family="{MONO}" font-size="9.5" fill="{FAINT}">{idx:02d}</text>',
           f'<text x="{x + 44:.1f}" y="{y + 25}" font-family="{MONO}" font-size="12" letter-spacing="1.6" fill="{INK}">{esc(label)}</text>',
           f'<text x="{x + bw - 20:.1f}" y="{y + 25}" text-anchor="end" font-family="{MONO}" font-size="13" fill="{ACC}">↗</text>')

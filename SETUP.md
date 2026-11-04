@@ -65,27 +65,31 @@ The default `GITHUB_TOKEN` only sees public activity.
 
 ## Avatar
 
-The header portrait is an LED dot matrix: every cell is a dot, empty cells glow dimly and coloured stars twinkle around the head. It prints in line by line, blinks every few seconds and a soft light sweeps over it.
+The header portrait is an LED dot matrix (72 x 86). Only the figure is lit; the frame stays dark, with small stars and sparkles drifting slowly behind it. It fades in and blinks every few seconds.
 
-The picture comes from `avatar/portrait.svg`, a flat cel-shaded illustration with one-dot outlines. `avatar/portrait.png` is that SVG rendered at 4x, and `scripts/make_avatar.py` turns it into `avatar/pixels.json` (64 x 77 dots). Each dot takes the dominant flat colour of its cell, so edges stay crisp.
+`avatar/portrait.png` is the cut-out source picture. `scripts/make_avatar.py` turns it into `avatar/pixels.json`, which the header reads.
 
-After editing the SVG, re-render the PNG (any SVG renderer at 1000 x 1204 px) and run:
+Re-run after changing the picture:
 
 ```bash
 python scripts/make_avatar.py
 ```
 
-Use your own photo instead:
+Use a different picture:
 
 ```bash
 pip install pillow
 ```
 
 ```bash
-python scripts/make_avatar.py path/to/photo.png --style photo --eyes 0.38,0.45,0.62,0.45
+python scripts/make_avatar.py path/to/image.png --remove-bg --eyes 0.38,0.41,0.57,0.41
 ```
 
-`--eyes` is optional: the normalised x,y of each eye centre, used for the blink. A transparent PNG cut-out works best. Commit `avatar/pixels.json` and the Action re-renders the header.
+- `--remove-bg` removes a white or checkerboard background by flood-filling from the edges, crops around the head and saves the result as `avatar/portrait.png`.
+- `--eyes` is optional: the x,y of each eye centre as fractions of the cropped picture, used for the blink.
+- `--style dots` (default) suits pixel and dot art, `photo` suits photos, `flat` suits flat illustrations.
+
+Commit `avatar/portrait.png` and `avatar/pixels.json`; the Action re-renders the header.
 
 ## Spacing
 

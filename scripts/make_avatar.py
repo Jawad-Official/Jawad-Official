@@ -2,16 +2,19 @@
 """Turn a portrait into the LED dot-matrix avatar used in the header.
 
   python scripts/make_avatar.py
-      Uses avatar/portrait.png, the bundled flat illustration (source:
-      avatar/portrait.svg, cropped to the head and shoulders). Each dot takes the
-      dominant flat colour of its cell, and outlines win ties, so edges stay
-      crisp. Eye positions are known, so the avatar blinks.
+      Uses avatar/portrait.png (transparent cut-out, already cropped).
 
-  python scripts/make_avatar.py path/to/photo.png --style photo [--eyes 0.40,0.45,0.60,0.45]
-      Uses your own photo: each dot is the average colour of its cell.
-      --eyes is the normalised x,y of each eye centre (0..1), for the blink.
-      A transparent PNG cut-out works best; for JPGs the background colour is
-      sampled from the top corners and dropped.
+  python scripts/make_avatar.py path/to/image.png --remove-bg --eyes 0.42,0.41,0.62,0.41
+      Uses another image. --remove-bg flood-fills light, grey background
+      (white, or a baked-in transparency checkerboard) in from the edges and
+      saves the cut-out as avatar/portrait.png. --eyes is the normalised x,y
+      of each eye centre in the cropped picture, used for the blink.
+
+Styles (--style):
+  dots   for pixel or dot art: average colour per cell, brightened by one
+         global gain so the dark gaps between source dots do not dim it (default)
+  photo  average colour per cell
+  flat   dominant colour per cell (flat illustrations)
 
 Writes avatar/pixels.json, read by scripts/generate.py. Needs Pillow.
 """
@@ -21,19 +24,66 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections import Counter
+from collections import Counter, deque
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "avatar" / "pixels.json"
 DEFAULT = ROOT / "avatar" / "portrait.png"
-DEFAULT_EYES = ((132 - 35) / 250, (171 - 26) / 301, (188 - 35) / 250, (171 - 26) / 301)
-OUTLINE = (0x1C, 0x16, 0x26)
-EYE_COLOURS = {"#f6f1ec", "#7a4a2c", "#ffffff", "#1c1626"}
+# Eye centres of the bundled portrait, as fractions of the cropped image.
+DEFAULT_EYES = (0.384, 0.407, 0.572, 0.406)
 
 
 def hexc(rgb) -> str:
     return "#%02x%02x%02x" % tuple(rgb[:3])
+
+
+def lum(p) -> float:
+    return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]
+
+
+def remove_background(img):
+    """Flood-fill light, low-saturation pixels from the borders into transparency."""
+    W, H = img.size
+    px = img.load()
+
+    def bgish(p):
+        return max(p[:3]) >= 150 and max(p[:3]) - min(p[:3]) <= 22
+
+    seen = bytearray(W * H)
+    q = deque([(x, y) for x in range(W) for y in (0, H - 1)] + [(x, y) for y in range(H) for x in (0, W - 1)])
+    while q:
+        x, y = q.popleft()
+        i = y * W + x
+        if seen[i] or not bgish(px[x, y]):
+            continue
+        seen[i] = 1
+        if x > 0: q.append((x - 1, y))
+        if x < W - 1: q.append((x + 1, y))
+        if y > 0: q.append((x, y - 1))
+        if y < H - 1: q.append((x, y + 1))
+    for y in range(H):
+        for x in range(W):
+            if seen[y * W + x]:
+                r, g, b, _ = px[x, y]
+                px[x, y] = (r, g, b, 0)
+    return img
+
+
+def auto_crop(img, aspect: float):
+    """Crop to the subject: small headroom on top, bottom kept, centred on the head."""
+    W, H = img.size
+    alpha = img.getchannel("A")
+    l, t, r, b = alpha.getbbox()
+    head_rows = t + int((b - t) * 0.45)
+    px = alpha.load()
+    xs = [x for y in range(t, head_rows, 4) for x in range(l, r, 4) if px[x, y] > 128]
+    cx = sum(xs) / len(xs) if xs else (l + r) / 2
+    top = max(0, t - int((b - t) * 0.02))
+    height = b - top
+    width = height * aspect
+    left = int(max(0, min(W - width, cx - width / 2)))
+    return img.crop((left, top, int(left + width), b))
 
 
 def main() -> None:
@@ -44,72 +94,77 @@ def main() -> None:
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("image", nargs="?", type=Path, default=DEFAULT)
-    ap.add_argument("--cols", type=int, default=64, help="dots across")
-    ap.add_argument("--style", choices=["flat", "photo"], default=None,
-                    help="flat: dominant colour per dot (illustrations); photo: average colour")
+    ap.add_argument("--cols", type=int, default=72, help="LEDs across")
+    ap.add_argument("--rows", type=int, default=86, help="LEDs down")
+    ap.add_argument("--style", choices=["dots", "photo", "flat"], default="dots")
+    ap.add_argument("--remove-bg", action="store_true", help="cut out a light or checkerboard background")
     ap.add_argument("--eyes", type=str, default=None, help="lx,ly,rx,ry normalised eye centres")
     args = ap.parse_args()
     bundled = args.image.resolve() == DEFAULT.resolve()
-    style = args.style or ("flat" if bundled else "photo")
 
     img = ImageOps.exif_transpose(Image.open(args.image)).convert("RGBA")
+    if args.remove_bg:
+        img = auto_crop(remove_background(img), args.cols / args.rows)
+        img.save(DEFAULT)
+        print(f"saved cut-out to {DEFAULT.relative_to(ROOT)} ({img.size[0]}x{img.size[1]})")
+
     W, H = img.size
-    cols = args.cols
-    cell = W / cols
-    rows = int(round(H / cell))
+    cols, rows = args.cols, args.rows
+    cw, ch = W / cols, H / rows
     px = img.load()
 
-    has_alpha = img.getextrema()[3][0] < 250
-    corners = [px[2, 2][:3], px[W - 3, 2][:3]]
-
-    def is_bg(p):
-        if has_alpha:
-            return p[3] < 128
-        return any(sum((a - b) ** 2 for a, b in zip(p[:3], c)) < 1200 for c in corners)
-
-    grid: list[list[str | None]] = []
+    grid: list[list] = []
+    ratios: list[float] = []
     for r in range(rows):
         row = []
         for c in range(cols):
-            x0, y0 = int(c * cell), int(r * cell)
-            x1, y1 = min(W, int((c + 1) * cell)), min(H, int((r + 1) * cell))
-            samples = [px[x, y] for y in range(y0, y1, 2) for x in range(x0, x1, 2)]
-            fg = [p for p in samples if not is_bg(p)]
+            x0, y0 = int(c * cw), int(r * ch)
+            x1, y1 = min(W, int((c + 1) * cw)), min(H, int((r + 1) * ch))
+            samples = [px[x, y] for y in range(y0, y1) for x in range(x0, x1)]
+            fg = [p for p in samples if p[3] >= 128]
             if not samples or len(fg) / len(samples) < 0.5:
                 row.append(None)
                 continue
-            if style == "flat":
-                dark = sum(1 for p in fg if sum(abs(a - b) for a, b in zip(p[:3], OUTLINE)) < 24)
-                if dark / len(fg) >= 0.3:
-                    row.append(hexc(OUTLINE))
-                else:
-                    row.append(hexc(Counter(p[:3] for p in fg).most_common(1)[0][0]))
+            if args.style == "dots":
+                # mean keeps thin dark features (outlines, moustache); the gain below
+                # undoes the dimming from the dark gaps between the source dots
+                fg.sort(key=lum)
+                top = fg[len(fg) // 2:]
+                mean = [sum(p[i] for p in fg) / len(fg) for i in range(3)]
+                bright = [sum(p[i] for p in top) / len(top) for i in range(3)]
+                ratios.append(lum(bright) / max(1.0, lum(mean)))
+                row.append(mean)
+            elif args.style == "flat":
+                row.append(hexc(Counter(p[:3] for p in fg).most_common(1)[0][0]))
             else:
-                n = len(fg)
-                row.append(hexc([sum(p[i] for p in fg) // n for i in range(3)]))
+                row.append(hexc([sum(p[i] for p in fg) // len(fg) for i in range(3)]))
         grid.append(row)
 
-    eyes = DEFAULT_EYES if (args.eyes is None and bundled) else None
-    if args.eyes:
-        eyes = tuple(float(v) for v in args.eyes.split(","))
+    if args.style == "dots" and ratios:
+        gain = min(1.5, sorted(ratios)[len(ratios) // 2] * 0.85)
+
+        def lift(c):  # scale all channels together so bright colours keep their hue
+            k = min(gain, 255 / max(1.0, max(c)))
+            return hexc([int(v * k) for v in c])
+        grid = [[lift(c) if isinstance(c, list) else c for c in row] for row in grid]
+
+    eyes = tuple(float(v) for v in args.eyes.split(",")) if args.eyes else (DEFAULT_EYES if bundled else None)
     blink = []
     if eyes:
         for ex, ey in ((eyes[0], eyes[1]), (eyes[2], eyes[3])):
             ec, er = int(ex * cols), int(ey * rows)
-            skin = grid[min(rows - 1, er + 3)][ec] or "#e8ad84"
-            for dr in (-2, -1, 0, 1):
+            skin = grid[min(rows - 1, er + 4)][ec] or "#e8ad84"
+            lash = "#2a1d1a"
+            for dr in (-2, -1, 0, 1, 2):
                 for dc in range(-4, 5):
                     r, c = er + dr, ec + dc
-                    if not (0 <= r < rows and 0 <= c < cols) or not grid[r][c]:
-                        continue
-                    if style == "flat" and grid[r][c] not in EYE_COLOURS:
-                        continue
-                    lid = r == er and abs(dc) <= 3
-                    blink.append([r, c, hexc(OUTLINE) if lid else skin])
+                    if 0 <= r < rows and 0 <= c < cols and grid[r][c]:
+                        closed_line = dr == 1 and abs(dc) <= 3
+                        blink.append([r, c, lash if closed_line else skin])
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({"cols": cols, "rows": rows, "pixels": grid, "blink": blink}))
-    print(f"wrote {OUT.relative_to(ROOT)} ({cols}x{rows}, {style}, {len(blink)} blink dots)")
+    print(f"wrote {OUT.relative_to(ROOT)} ({cols}x{rows}, {args.style}, {len(blink)} blink dots)")
 
 
 if __name__ == "__main__":
