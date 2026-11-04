@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="200" height="46" viewBox="0 0 200 46" role="img" aria-label="Cv">
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="54" viewBox="0 0 220 54" role="img" aria-label="Cv">
 <title>Cv</title>
 <style>
 .fu{animation:fu .9s cubic-bezier(.2,.8,.2,1) both}
@@ -18,11 +18,11 @@
 </style>
 <defs></defs>
 <g transform="translate(0,0)">
-<rect x="1" y="1" width="198" height="44" rx="10" fill="#080b10" stroke="#263243"/>
-<path d="M5,15 V5 H15" fill="none" stroke="#3ee6c1" stroke-width="1.5"/>
-<path d="M195,31 V41 H185" fill="none" stroke="#3ee6c1" stroke-width="1.5"/>
-<text x="20" y="28" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="9.5" fill="#4f5b6b">04</text>
-<text x="44" y="28" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="12" letter-spacing="1.6" fill="#e8edf2">CV</text>
-<text x="180" y="28" text-anchor="end" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="13" fill="#3ee6c1">↗</text>
+<rect x="4.0" y="6" width="206.0" height="42" rx="10" fill="#080b10" stroke="#263243"/>
+<path d="M8.0,20 V10 H18.0" fill="none" stroke="#3ee6c1" stroke-width="1.5"/>
+<path d="M206.0,34 V44 H196.0" fill="none" stroke="#3ee6c1" stroke-width="1.5"/>
+<text x="24.0" y="31" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="9.5" fill="#4f5b6b">04</text>
+<text x="48.0" y="31" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="12" letter-spacing="1.6" fill="#e8edf2">CV</text>
+<text x="190.0" y="31" text-anchor="end" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="13" fill="#3ee6c1">↗</text>
 </g>
 </svg>
