@@ -45,7 +45,7 @@ LIVE = "#4ade80"
 SANS = "-apple-system, 'Segoe UI', Ubuntu, 'Helvetica Neue', Arial, sans-serif"
 MONO = "'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
 
-PAD = -6  # trims the transparent margin above and below each card (negative = tighter)
+PAD = -9  # trims the transparent margin above and below each card (negative = tighter)
 
 CITY_LEVELS = ["#11242c", "#0e5a50", "#119482", "#22c7a6", "#7ff5d8"]
 
@@ -751,13 +751,13 @@ def render_panels(cfg: dict, data: dict) -> str:
         s.add(f'<text x="{bx}" y="{Y0 + CH - 16}" font-family="{MONO}" font-size="8.5" fill="{FAINT}">markup &amp; config excluded</text>')
 
     # ---- selected work card
-    PX = X0 + LW + 10
+    PX = X0 + LW + 8
     PW = W - 10 - PX
     s.card(PX, Y0, PW, CH)
     s.heading(PX + 26, 42, "TABLE 1", "Selected work", "./projects.sh --featured", PX + PW - 26)
     s.hline(PX + 1, PX + PW - 1, 60)
 
-    gap = 12
+    gap = 10
     cw = (PW - 52 - gap) / 2
     chh = (CH - 50 - 26 - gap) / 2
     for i, p in enumerate(data["featured"][:4]):

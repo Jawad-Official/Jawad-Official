@@ -1,9 +1,7 @@
 <div align="center">
 
 <img src="assets/header.svg" width="100%" alt="Jawad Alarman. AI engineer, research to product. Live GitHub readouts and a halftone portrait." />
-
 <img src="assets/city.svg" width="100%" alt="Isometric 3D city of my contributions over the last year" />
-
 <img src="assets/panels.svg" width="100%" alt="Language stack and selected work" />
 
 <a href="https://jawad-alarman.onrender.com/"><img src="assets/btn-portfolio.svg" width="23%" alt="Portfolio" /></a>
