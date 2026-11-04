@@ -1,0 +1,34 @@
+{
+  "username": "Jawad-Official",
+  "name": "Jawad Alarman",
+  "title": "AI Engineer · LLM pipelines · Applied ML",
+  "location": "Amman, Jordan",
+  "status": "Open to work",
+  "badge": "1st · JoHackathon 2025",
+  "pills": ["Python", "TypeScript", "FastAPI", "Next.js", "React", "scikit-learn"],
+  "exclude_languages": ["HTML", "CSS", "SCSS", "Dockerfile", "Shell", "Mako", "Batchfile", "PowerShell", "Makefile", "Procfile"],
+  "top_languages": 5,
+  "city_title": "The city I built this year",
+  "featured": [
+    {
+      "repo": "EcoLens",
+      "description": "Hackathon winner: live Earth data on a 3D globe.",
+      "tags": ["hackathon", "3d-globe"]
+    },
+    {
+      "repo": "Astrozen",
+      "description": "AI planner: raw idea to PRD, blueprint, tickets.",
+      "tags": ["llm", "fastapi"]
+    },
+    {
+      "repo": "Alfred",
+      "description": "AI-powered personal assistant.",
+      "tags": ["ai", "python"]
+    },
+    {
+      "repo": "De-Board",
+      "description": "Notes on a detective crime-board canvas.",
+      "tags": ["markdown", "ux"]
+    }
+  ]
+}
