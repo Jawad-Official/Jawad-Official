@@ -20,10 +20,10 @@
 <g transform="translate(0,-4)">
 <rect x="10" y="10" width="860" height="410" rx="14" fill="#080b10" stroke="#263243"/>
 <rect x="10" y="10" width="860" height="410" rx="14" fill="url(#dots20)"/>
-<path d="M14,28 V14 H28" fill="none" stroke="#3ee6c1" stroke-width="1.6" stroke-opacity=".8"/>
-<path d="M866,28 V14 H852" fill="none" stroke="#3ee6c1" stroke-width="1.6" stroke-opacity=".8"/>
-<path d="M14,402 V416 H28" fill="none" stroke="#3ee6c1" stroke-width="1.6" stroke-opacity=".8"/>
-<path d="M866,402 V416 H852" fill="none" stroke="#3ee6c1" stroke-width="1.6" stroke-opacity=".8"/>
+<path d="M20,32 V20 H32" fill="none" stroke="#3ee6c1" stroke-width="1.6" stroke-opacity=".8"/>
+<path d="M860,32 V20 H848" fill="none" stroke="#3ee6c1" stroke-width="1.6" stroke-opacity=".8"/>
+<path d="M20,398 V410 H32" fill="none" stroke="#3ee6c1" stroke-width="1.6" stroke-opacity=".8"/>
+<path d="M860,398 V410 H848" fill="none" stroke="#3ee6c1" stroke-width="1.6" stroke-opacity=".8"/>
 <text x="40" y="42" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="10.5" letter-spacing="1.6" fill="#3ee6c1">FIG. 1</text>
 <text x="99.8" y="43" font-family="-apple-system, 'Segoe UI', Ubuntu, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="650" fill="#e8edf2">Contribution city</text>
 <text x="840" y="42" text-anchor="end" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="10" letter-spacing=".6" fill="#8794a5">LAST 365 DAYS  ·  HEIGHT ∝ √CONTRIBUTIONS</text>

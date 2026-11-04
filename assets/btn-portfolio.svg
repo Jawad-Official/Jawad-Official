@@ -19,8 +19,8 @@
 <defs></defs>
 <g transform="translate(0,0)">
 <rect x="10.0" y="6" width="206.0" height="42" rx="10" fill="#080b10" stroke="#263243"/>
-<path d="M14.0,20 V10 H24.0" fill="none" stroke="#3ee6c1" stroke-width="1.5"/>
-<path d="M212.0,34 V44 H202.0" fill="none" stroke="#3ee6c1" stroke-width="1.5"/>
+<path d="M17.0,23 V13 H27.0" fill="none" stroke="#3ee6c1" stroke-width="1.5"/>
+<path d="M209.0,31 V41 H199.0" fill="none" stroke="#3ee6c1" stroke-width="1.5"/>
 <text x="30.0" y="31" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="9.5" fill="#4f5b6b">01</text>
 <text x="54.0" y="31" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="12" letter-spacing="1.6" fill="#e8edf2">PORTFOLIO</text>
 <text x="196.0" y="31" text-anchor="end" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="13" fill="#3ee6c1">↗</text>
