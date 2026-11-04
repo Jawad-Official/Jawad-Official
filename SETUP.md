@@ -4,13 +4,14 @@ Everything in this folder becomes the root of a new repository named exactly `Ja
 
 ```mermaid
 flowchart LR
-    cfg[config.json<br/>name, title, pills, featured repos] --> gen
-    av[avatar/pixels.json<br/>dotted pixel man] --> gen
+    cfg[config.json<br/>name, role, facts, featured repos] --> gen
+    av[avatar/pixels.json<br/>halftone portrait] --> gen
     api[(GitHub GraphQL API<br/>repos, stars, calendar, languages)] --> gen
     gen[scripts/generate.py<br/>stdlib only] --> h[assets/header.svg]
     gen --> c[assets/city.svg]
     gen --> p[assets/panels.svg]
-    h & c & p --> readme[README.md<br/>profile page]
+    gen --> b[assets/btn-*.svg]
+    h & c & p & b --> readme[README.md<br/>profile page]
     cron[GitHub Action<br/>daily 03:17 UTC + on push] --> gen
 ```
 
@@ -54,15 +55,17 @@ The default `GITHUB_TOKEN` only sees public activity.
 
 | What | Where |
 | --- | --- |
-| Name, title, location, badge, pills | `config.json` |
-| Featured projects (up to 4), descriptions, tags | `config.json` `featured` |
+| Name, role, tagline, facts, stack line | `config.json` |
+| Selected work (up to 4 public repos), descriptions, tags | `config.json` `featured` |
+| Repos left out of the stats | `config.json` `exclude_repos` |
+| Link buttons | `config.json` `links` and `README.md` |
 | Languages to hide (HTML, CSS, ...) | `config.json` `exclude_languages` |
 | Colours | constants at the top of `scripts/generate.py` |
 | Avatar | see below |
 
 ## Avatar
 
-The header ships with a hand-drawn dotted pixel-art man (short hair, beard, teal hoodie).
+The header portrait is a vector illustration (`avatar/portrait.svg`, rendered to `avatar/portrait.png`) converted into a 48 x 60 dot halftone. It ripples in from the centre and blinks every few seconds.
 
 Use your own photo instead:
 
@@ -71,18 +74,16 @@ pip install pillow
 ```
 
 ```bash
-python scripts/make_avatar.py path/to/photo.jpg
+python scripts/make_avatar.py path/to/photo.png --eyes 0.38,0.45,0.62,0.45
 ```
 
-A head-and-shoulders shot on a plain background works best. Commit `avatar/pixels.json` and the Action re-renders the header.
+`--eyes` is optional: the normalised x,y of each eye centre, used for the blink. A transparent PNG cut-out works best. Commit `avatar/pixels.json` and the Action re-renders the header.
 
-Go back to the drawn version:
+Go back to the illustration:
 
 ```bash
-python scripts/make_avatar.py --default
+python scripts/make_avatar.py
 ```
-
-To edit the drawn man by hand, change the `DEFAULT_ART` grid in `scripts/make_avatar.py`. Each character is one dot; the colours are in `PALETTE`.
 
 ## Preview locally
 

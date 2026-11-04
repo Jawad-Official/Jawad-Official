@@ -1,34 +1,45 @@
 {
   "username": "Jawad-Official",
   "name": "Jawad Alarman",
-  "title": "AI Engineer · LLM pipelines · Applied ML",
+  "role": "AI ENGINEER  /  RESEARCH → PRODUCT",
+  "tagline": "turning research into systems people use",
   "location": "Amman, Jordan",
-  "status": "Open to work",
-  "badge": "1st · JoHackathon 2025",
-  "pills": ["Python", "TypeScript", "FastAPI", "Next.js", "React", "scikit-learn"],
+  "coords": "31.95°N 35.93°E",
+  "facts": [
+    { "key": "STUDY", "value": "BSc AI & Data Science · HTU" },
+    { "key": "AWARD", "value": "1st place · JoHackathon 2025", "tone": "warm" },
+    { "key": "STATUS", "value": "Open to work · Amman or remote", "tone": "live" }
+  ],
+  "stack": ["python", "typescript", "fastapi", "next.js", "react", "scikit-learn"],
+  "exclude_repos": ["Jawad-Official"],
   "exclude_languages": ["HTML", "CSS", "SCSS", "Dockerfile", "Shell", "Mako", "Batchfile", "PowerShell", "Makefile", "Procfile"],
   "top_languages": 5,
-  "city_title": "The city I built this year",
   "featured": [
     {
       "repo": "EcoLens",
-      "description": "Hackathon winner: live Earth data on a 3D globe.",
-      "tags": ["hackathon", "3d-globe"]
+      "description": "Fires, air quality and weather, live on a 3D Cesium globe.",
+      "tags": ["hackathon", "geospatial"]
     },
     {
       "repo": "Astrozen",
-      "description": "AI planner: raw idea to PRD, blueprint, tickets.",
+      "description": "Raw idea in; PRD, architecture blueprint and tickets out.",
       "tags": ["llm", "fastapi"]
     },
     {
-      "repo": "Alfred",
-      "description": "AI-powered personal assistant.",
-      "tags": ["ai", "python"]
+      "repo": "De-Board",
+      "description": "Local-first markdown notes laid out on a detective crime board.",
+      "tags": ["local-first", "ux"]
     },
     {
-      "repo": "De-Board",
-      "description": "Notes on a detective crime-board canvas.",
-      "tags": ["markdown", "ux"]
+      "repo": "writing-toolkit-skills",
+      "description": "Claude Agent Skills for grounded reports and scripts.",
+      "tags": ["agents", "writing"]
     }
+  ],
+  "links": [
+    { "label": "PORTFOLIO", "url": "https://jawad-alarman.onrender.com/" },
+    { "label": "LINKEDIN", "url": "https://www.linkedin.com/in/jawad-alarman" },
+    { "label": "EMAIL", "url": "mailto:jawad.arman.official@gmail.com" },
+    { "label": "CV", "url": "https://jawad-alarman.onrender.com/cv.pdf" }
   ]
 }

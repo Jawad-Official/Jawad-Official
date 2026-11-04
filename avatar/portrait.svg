@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="270" height="338" viewBox="95 90 270 338">
+  <defs>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f3c39a"/>
+      <stop offset=".55" stop-color="#e2a676"/>
+      <stop offset="1" stop-color="#a86d48"/>
+    </linearGradient>
+    <linearGradient id="neck" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9c6342"/>
+      <stop offset="1" stop-color="#c88c63"/>
+    </linearGradient>
+    <linearGradient id="hood" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2b3747"/>
+      <stop offset=".6" stop-color="#1c2531"/>
+      <stop offset="1" stop-color="#12403f"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3a2c25"/>
+      <stop offset="1" stop-color="#140f0d"/>
+    </linearGradient>
+    <radialGradient id="cheek" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#e58f73" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#e58f73" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- shoulders / hoodie -->
+  <path d="M30 520 C40 455 80 425 150 405 L185 392 L275 392 L310 405 C380 425 420 455 430 520 Z" fill="url(#hood)"/>
+  <!-- hood collar -->
+  <path d="M150 405 C160 380 185 372 200 372 L230 420 L260 372 C275 372 300 380 310 405 C300 430 270 445 230 448 C190 445 160 430 150 405 Z" fill="#222c39"/>
+  <path d="M175 398 C190 425 210 438 230 440 C250 438 270 425 285 398" fill="none" stroke="#3a4a5e" stroke-width="5"/>
+  <!-- drawstrings -->
+  <path d="M208 432 L203 500" stroke="#3ee6c1" stroke-width="6" stroke-linecap="round"/>
+  <path d="M252 432 L257 500" stroke="#3ee6c1" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="203" cy="503" r="6" fill="#a5fbe6"/>
+  <circle cx="257" cy="503" r="6" fill="#a5fbe6"/>
+  <!-- rim light on right shoulder -->
+  <path d="M310 405 C380 425 420 455 430 520" fill="none" stroke="#3ee6c1" stroke-opacity=".55" stroke-width="7"/>
+
+  <!-- neck -->
+  <path d="M192 330 L192 392 C205 410 255 410 268 392 L268 330 Z" fill="url(#neck)"/>
+
+  <!-- ears -->
+  <ellipse cx="141" cy="262" rx="15" ry="27" fill="#d99b6e"/>
+  <ellipse cx="143" cy="264" rx="7" ry="15" fill="#b27350"/>
+  <ellipse cx="319" cy="262" rx="15" ry="27" fill="#a3694a"/>
+  <ellipse cx="317" cy="264" rx="7" ry="15" fill="#8a5538"/>
+
+  <!-- face -->
+  <path d="M148 200 C148 140 312 140 312 200 L314 262 C312 318 272 362 230 370 C188 362 148 318 146 262 Z" fill="url(#skin)"/>
+  <ellipse cx="180" cy="290" rx="22" ry="14" fill="url(#cheek)"/>
+  <ellipse cx="280" cy="290" rx="22" ry="14" fill="url(#cheek)"/>
+
+  <!-- beard (short, follows jaw) -->
+  <path d="M148 262 C150 318 190 362 230 372 C270 362 310 318 312 262 C304 290 296 300 286 306 C272 318 256 332 230 334 C204 332 188 318 174 306 C164 300 156 290 148 262 Z" fill="#2a1f1a" fill-opacity=".92"/>
+  <!-- mustache -->
+  <path d="M198 312 C204 300 218 294 230 298 C242 294 256 300 262 312 C252 306 242 305 230 308 C218 305 208 306 198 312 Z" fill="#2a1f1a" fill-opacity=".9"/>
+  <!-- lips -->
+  <path d="M208 320 C218 316 242 316 252 320 C244 330 216 330 208 320 Z" fill="#9a5444"/>
+  <path d="M208 320 C220 323 240 323 252 320" stroke="#5e2f26" stroke-width="2" fill="none"/>
+  <!-- chin beard fill under lip -->
+  <path d="M214 334 C222 344 238 344 246 334" fill="none" stroke="#1d1512" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- nose -->
+  <path d="M228 238 C226 262 222 278 218 288 C224 296 238 296 244 288 C240 278 236 262 234 238" fill="#c98a5f" fill-opacity=".55"/>
+  <path d="M216 290 C222 297 238 297 246 290" stroke="#8d5638" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <ellipse cx="236" cy="268" rx="3" ry="12" fill="#f6d2b0" fill-opacity=".6"/>
+
+  <!-- eyes -->
+  <g id="eyes">
+    <path d="M172 244 C180 234 202 234 210 244 C202 250 180 250 172 244 Z" fill="#f4efe9"/>
+    <path d="M250 244 C258 234 280 234 288 244 C280 250 258 250 250 244 Z" fill="#f4efe9"/>
+    <circle cx="192" cy="243" r="7" fill="#4a2e1f"/>
+    <circle cx="270" cy="243" r="7" fill="#4a2e1f"/>
+    <circle cx="192" cy="243" r="3.4" fill="#0b0705"/>
+    <circle cx="270" cy="243" r="3.4" fill="#0b0705"/>
+    <circle cx="195" cy="240" r="2" fill="#ffffff"/>
+    <circle cx="273" cy="240" r="2" fill="#ffffff"/>
+    <path d="M170 243 C180 231 202 231 212 242" stroke="#1a110d" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M248 242 C258 231 280 231 290 243" stroke="#1a110d" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  </g>
+  <!-- brows -->
+  <path d="M164 222 C176 210 198 210 214 218 L212 225 C198 219 180 219 166 228 Z" fill="#1d1411"/>
+  <path d="M296 222 C284 210 262 210 246 218 L248 225 C262 219 280 219 294 228 Z" fill="#1d1411"/>
+
+  <!-- hair: short textured crop with faded sides -->
+  <path d="M142 238 C128 186 140 132 186 108 C200 92 222 86 244 92 C262 86 286 94 298 110 C326 132 332 182 318 238 C314 214 310 196 304 186 C290 168 262 162 232 166 C200 162 170 170 158 186 C150 198 146 214 142 238 Z" fill="url(#hair)"/>
+  <path d="M158 160 C168 122 204 100 240 98 C224 108 208 122 200 140 C186 142 170 150 158 160 Z" fill="#4a382e"/>
+  <path d="M244 96 C270 96 296 112 306 134 C290 122 268 116 248 118 Z" fill="#3a2b24"/>
+  <path d="M180 140 C192 120 214 108 238 106" stroke="#6a5244" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M206 132 C222 116 248 110 272 116" stroke="#5a463a" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M166 172 C176 152 196 140 218 136" stroke="#5a463a" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M262 100 C290 108 314 132 320 170" stroke="#3ee6c1" stroke-opacity=".3" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- side fade -->
+  <path d="M142 238 C142 214 146 198 152 188 L156 230 Z" fill="#3a2c25" fill-opacity=".6"/>
+  <path d="M318 238 C318 214 314 198 308 188 L304 230 Z" fill="#2a201b" fill-opacity=".6"/>
+  <!-- rim light on face right edge -->
+  <path d="M312 200 L314 262 C312 318 272 362 230 370" fill="none" stroke="#3ee6c1" stroke-opacity=".45" stroke-width="5"/>
+</svg>

@@ -2,9 +2,10 @@
 """Render the profile dashboard SVGs from live GitHub data.
 
 Outputs (in assets/):
-  header.svg  animated name card, live stats, dotted pixel avatar
-  city.svg    3D isometric contribution city for the last year
-  panels.svg  language stack + featured projects
+  header.svg     identity, live readouts, halftone portrait
+  city.svg       isometric contribution city for the last year
+  panels.svg     language stack + selected work
+  btn-*.svg      link buttons
 
 Usage:
   GH_TOKEN=... python scripts/generate.py      # live data (used by the Action)
@@ -29,32 +30,51 @@ from xml.sax.saxutils import escape
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "assets"
 
-# ---------------------------------------------------------------- theme
-BG = "#0b1220"
-PANEL = "#0f1a2b"
-CARD = "#132238"
-BORDER = "#1f3a4d"
-TEXT = "#e6edf3"
-MUTED = "#8b9bb0"
-TEAL = "#2dd4bf"
-MINT = "#5eead4"
-PURPLE = "#a78bfa"
-SANS = "'Segoe UI', Ubuntu, 'Helvetica Neue', Arial, sans-serif"
-MONO = "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
+# ------------------------------------------------------------------ theme
+BG0 = "#080b10"   # card
+BG1 = "#0d1219"   # inset surfaces
+LINE = "#1b2430"  # hairlines
+LINE2 = "#263243"
+INK = "#e8edf2"
+DIM = "#8794a5"
+FAINT = "#4f5b6b"
+ACC = "#3ee6c1"   # mint accent
+WARM = "#ffb454"  # award / peak
+LIVE = "#4ade80"
+SANS = "-apple-system, 'Segoe UI', Ubuntu, 'Helvetica Neue', Arial, sans-serif"
+MONO = "'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
+
+CITY_LEVELS = ["#11242c", "#0e5a50", "#119482", "#22c7a6", "#7ff5d8"]
 
 LANG_FALLBACK = {
     "Python": "#3572A5", "TypeScript": "#3178c6", "JavaScript": "#f1e05a",
     "Jupyter Notebook": "#DA5B0B", "Markdown": "#083fa1", "Rust": "#dea584",
-    "Kotlin": "#A97BFF", "Go": "#00ADD8", "Java": "#b07219", "C++": "#f34b7d",
 }
 
-# ---------------------------------------------------------------- data
+BASE_CSS = """
+.fu{animation:fu .9s cubic-bezier(.2,.8,.2,1) both}
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.fi{animation:fi 1s ease-out both}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+.cur{animation:blink 1.05s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.pulse{animation:pulse 2.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.ring{transform-box:fill-box;transform-origin:center;animation:ring 2.2s ease-out infinite}
+@keyframes ring{from{transform:scale(1);opacity:.8}to{transform:scale(3.2);opacity:0}}
+.gx{transform-box:fill-box;transform-origin:0 50%;animation:gx 1.4s cubic-bezier(.2,.8,.2,1) both}
+@keyframes gx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.gy{transform-box:fill-box;transform-origin:50% 100%;animation:gy 1.1s cubic-bezier(.2,.8,.2,1) both}
+@keyframes gy{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+"""
+
+
+# ------------------------------------------------------------------ data
 GRAPHQL = "https://api.github.com/graphql"
 
 USER_QUERY = """
 query($login: String!) {
   user(login: $login) {
-    name
     followers { totalCount }
     repositories(ownerAffiliations: OWNER, isFork: false, privacy: PUBLIC, first: 100) {
       totalCount
@@ -78,9 +98,11 @@ query($login: String!) {
 
 REPO_FRAGMENT = """
   r%d: repository(owner: "%s", name: "%s") {
-    name description stargazerCount pushedAt
+    name description stargazerCount pushedAt isPrivate
     primaryLanguage { name color }
-    languages(first: 10) { totalSize edges { size node { name } } }
+    languages(first: 6, orderBy: {field: SIZE, direction: DESC}) {
+      totalSize edges { size node { name color } }
+    }
   }
 """
 
@@ -88,27 +110,34 @@ REPO_FRAGMENT = """
 def gql(token: str, query: str, variables: dict | None = None) -> dict:
     body = json.dumps({"query": query, "variables": variables or {}}).encode()
     req = urllib.request.Request(
-        GRAPHQL,
-        data=body,
+        GRAPHQL, data=body,
         headers={"Authorization": f"bearer {token}", "Content-Type": "application/json",
                  "User-Agent": "profile-dashboard"},
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
         payload = json.load(resp)
-    if payload.get("errors"):
-        sys.exit(f"GraphQL error: {payload['errors']}")
+    for err in payload.get("errors") or []:
+        # A missing or private featured repo is reported here; keep going with the rest.
+        print(f"warning: {err.get('message')}", file=sys.stderr)
+    if not payload.get("data"):
+        sys.exit("GraphQL returned no data.")
     return payload["data"]
 
 
 def fetch_live(cfg: dict, token: str) -> dict:
     login = cfg["username"]
     user = gql(token, USER_QUERY, {"login": login})["user"]
+    if not user:
+        sys.exit(f"User {login} not found.")
 
-    featured_q = "query {" + "".join(
-        REPO_FRAGMENT % (i, *(f["repo"].split("/", 1) if "/" in f["repo"] else (login, f["repo"])))
-        for i, f in enumerate(cfg["featured"])
-    ) + "}"
-    repos_raw = gql(token, featured_q) if cfg["featured"] else {}
+    featured_cfg = cfg.get("featured", [])
+    repos_raw = {}
+    if featured_cfg:
+        q = "query {" + "".join(
+            REPO_FRAGMENT % (i, *(f["repo"].split("/", 1) if "/" in f["repo"] else (login, f["repo"])))
+            for i, f in enumerate(featured_cfg)
+        ) + "}"
+        repos_raw = gql(token, q)
 
     days = [
         {"date": d["date"], "count": d["contributionCount"], "weekday": d["weekday"]}
@@ -116,10 +145,14 @@ def fetch_live(cfg: dict, token: str) -> dict:
         for d in w["contributionDays"]
     ]
 
+    skip = {r.lower() for r in cfg.get("exclude_repos", [])}
     lang_bytes: dict[str, int] = {}
     lang_color: dict[str, str] = {}
-    stars = 0
+    stars = repos = 0
     for repo in user["repositories"]["nodes"]:
+        if repo["name"].lower() in skip:
+            continue
+        repos += 1
         stars += repo["stargazerCount"]
         for edge in repo["languages"]["edges"]:
             n = edge["node"]["name"]
@@ -128,14 +161,13 @@ def fetch_live(cfg: dict, token: str) -> dict:
                 lang_color[n] = edge["node"]["color"]
 
     featured = []
-    for i, f in enumerate(cfg["featured"]):
+    for i, f in enumerate(featured_cfg):
         r = repos_raw.get(f"r{i}")
-        if not r:
-            print(f"warning: featured repo {f['repo']} not found, skipped", file=sys.stderr)
+        if not r or r.get("isPrivate"):
+            print(f"warning: featured repo {f['repo']} is private or missing, skipped", file=sys.stderr)
             continue
+        prim = r["primaryLanguage"] or {"name": "n/a", "color": FAINT}
         total = r["languages"]["totalSize"] or 1
-        prim = r["primaryLanguage"] or {"name": "n/a", "color": MUTED}
-        share = next((e["size"] for e in r["languages"]["edges"] if e["node"]["name"] == prim["name"]), 0)
         featured.append({
             "name": r["name"],
             "description": f.get("description") or r["description"] or "",
@@ -143,19 +175,13 @@ def fetch_live(cfg: dict, token: str) -> dict:
             "stars": r["stargazerCount"],
             "pushed": r["pushedAt"],
             "language": prim["name"],
-            "color": prim["color"] or MUTED,
-            "share": round(100 * share / total),
+            "color": prim["color"] or FAINT,
+            "mix": [(e["node"]["name"], e["node"]["color"] or FAINT, e["size"] / total)
+                    for e in r["languages"]["edges"]],
         })
 
-    return {
-        "repos": user["repositories"]["totalCount"],
-        "stars": stars,
-        "followers": user["followers"]["totalCount"],
-        "days": days,
-        "lang_bytes": lang_bytes,
-        "lang_color": lang_color,
-        "featured": featured,
-    }
+    return {"repos": repos, "stars": stars, "followers": user["followers"]["totalCount"],
+            "days": days, "lang_bytes": lang_bytes, "lang_color": lang_color, "featured": featured}
 
 
 def fetch_demo(cfg: dict) -> dict:
@@ -163,38 +189,37 @@ def fetch_demo(cfg: dict) -> dict:
     rng = random.Random(7)
     end = date.today()
     start = end - timedelta(days=364 + (end.weekday() + 1) % 7)
-    days = []
-    d = start
+    days, d = [], start
     while d <= end:
         wd = (d.weekday() + 1) % 7
         burst = 1.0 + 1.6 * math.sin((d - start).days / 40) ** 2
-        base = rng.random()
-        count = 0 if base < 0.35 else int(rng.expovariate(1 / (4 * burst)))
+        count = 0 if rng.random() < 0.38 else int(rng.expovariate(1 / (3.5 * burst)))
         if wd in (5, 6) and rng.random() < 0.5:
             count //= 2
         days.append({"date": d.isoformat(), "count": count, "weekday": wd})
         d += timedelta(days=1)
     now = datetime.now(timezone.utc)
-    sample = [("TypeScript", "#3178c6", 3, 62), ("TypeScript", "#3178c6", 1, 71),
-              ("Python", "#3572A5", 1, 88), ("TypeScript", "#3178c6", 1, 94)]
+    mixes = [[("TypeScript", "#3178c6", .78), ("Python", "#3572A5", .2), ("CSS", "#663399", .02)],
+             [("TypeScript", "#3178c6", .62), ("Python", "#3572A5", .36), ("Mako", "#7e858d", .02)],
+             [("TypeScript", "#3178c6", .9), ("CSS", "#663399", .1)],
+             [("Markdown", "#083fa1", .7), ("Python", "#3572A5", .3)]]
     featured = []
-    for f, (lang, color, stars, share) in zip(cfg["featured"], sample):
+    for f, mix in zip(cfg["featured"], mixes):
         featured.append({
             "name": f["repo"].split("/")[-1], "description": f.get("description", ""),
-            "tags": f.get("tags", []), "stars": stars, "language": lang, "color": color,
-            "share": share, "pushed": (now - timedelta(days=rng.randint(0, 20))).isoformat(),
+            "tags": f.get("tags", []), "stars": rng.randint(0, 4), "language": mix[0][0],
+            "color": mix[0][1], "mix": mix,
+            "pushed": (now - timedelta(days=rng.randint(0, 40))).isoformat(),
         })
-    return {
-        "repos": 12, "stars": 9, "followers": 4, "days": days,
-        "lang_bytes": {"TypeScript": 5_400_000, "Python": 2_100_000, "JavaScript": 300_000,
-                       "Jupyter Notebook": 180_000, "Markdown": 90_000, "HTML": 800_000},
-        "lang_color": {"TypeScript": "#3178c6", "Python": "#3572A5", "JavaScript": "#f1e05a",
-                       "Jupyter Notebook": "#DA5B0B", "Markdown": "#083fa1"},
-        "featured": featured,
-    }
+    return {"repos": 5, "stars": 6, "followers": 0, "days": days,
+            "lang_bytes": {"TypeScript": 4_900_000, "Python": 1_700_000, "Markdown": 260_000,
+                           "JavaScript": 120_000, "HTML": 800_000},
+            "lang_color": {"TypeScript": "#3178c6", "Python": "#3572A5", "JavaScript": "#f1e05a",
+                           "Markdown": "#083fa1"},
+            "featured": featured}
 
 
-# ---------------------------------------------------------------- helpers
+# ------------------------------------------------------------------ helpers
 def esc(s) -> str:
     return escape(str(s), {'"': "&quot;"})
 
@@ -203,15 +228,27 @@ def fmt(n: int) -> str:
     return f"{n/1000:.1f}k" if n >= 10_000 else f"{n:,}"
 
 
-def text_w(s: str, size: float, mono: bool = False) -> float:
-    """Rough text width; SVG in <img> cannot measure fonts."""
-    return len(s) * size * (0.61 if mono else 0.58)
+def tw(s: str, size: float, mono: bool = False) -> float:
+    """Approximate text width; an SVG inside <img> cannot measure fonts."""
+    return len(s) * size * (0.6 if mono else 0.55)
 
 
 def shade(hex_color: str, k: float) -> str:
     h = hex_color.lstrip("#")
     r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
     return "#%02x%02x%02x" % tuple(max(0, min(255, int(c * k))) for c in (r, g, b))
+
+
+def lum(hex_color: str) -> float:
+    h = hex_color.lstrip("#")
+    r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def mix(a: str, b: str, t: float) -> str:
+    pa = [int(a.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)]
+    pb = [int(b.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)]
+    return "#%02x%02x%02x" % tuple(int(x + (y - x) * t) for x, y in zip(pa, pb))
 
 
 def wrap(s: str, width: int, lines: int) -> list[str]:
@@ -226,7 +263,7 @@ def wrap(s: str, width: int, lines: int) -> list[str]:
         out.append(cur)
     if len(out) > lines:
         out = out[:lines]
-        out[-1] = out[-1][: width - 1].rstrip(" .,") + "…"
+        out[-1] = out[-1][: width - 1].rstrip(" .,:") + "…"
     return out
 
 
@@ -234,14 +271,16 @@ def ago(iso: str) -> str:
     then = datetime.fromisoformat(iso.replace("Z", "+00:00"))
     days = (datetime.now(timezone.utc) - then).days
     if days <= 0:
-        return "updated today"
-    if days == 1:
-        return "updated 1d ago"
+        return "today"
     if days < 30:
-        return f"updated {days}d ago"
+        return f"{days}d ago"
     if days < 365:
-        return f"updated {days // 30}mo ago"
-    return f"updated {days // 365}y ago"
+        return f"{days // 30}mo ago"
+    return f"{days // 365}y ago"
+
+
+def size_str(b: int) -> str:
+    return f"{b/1_000_000:.1f} MB" if b >= 1_000_000 else f"{b/1000:.0f} KB"
 
 
 def streaks(days: list[dict]) -> tuple[int, int]:
@@ -249,10 +288,8 @@ def streaks(days: list[dict]) -> tuple[int, int]:
     for d in days:
         run = run + 1 if d["count"] else 0
         longest = max(longest, run)
+    seq = days[:-1] if days and days[-1]["count"] == 0 else days  # today may not be done yet
     cur = 0
-    seq = list(days)
-    if seq and seq[-1]["count"] == 0:  # today not counted yet
-        seq = seq[:-1]
     for d in reversed(seq):
         if not d["count"]:
             break
@@ -260,221 +297,286 @@ def streaks(days: list[dict]) -> tuple[int, int]:
     return cur, longest
 
 
-def svg_open(w: int, h: int, title: str, css: str = "") -> str:
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
-        f'role="img" aria-label="{esc(title)}">\n<title>{esc(title)}</title>\n'
-        f"<style>{css}</style>\n"
-    )
+class Svg:
+    """Tiny builder that collects CSS, defs and body for one SVG file."""
+
+    _uid = 0
+
+    def __init__(self, w: int, h: int, title: str):
+        self.w, self.h, self.title = w, h, title
+        self.css = [BASE_CSS]
+        self.defs: list[str] = []
+        self.body: list[str] = []
+
+    def uid(self, p: str = "u") -> str:
+        Svg._uid += 1
+        return f"{p}{Svg._uid}"
+
+    def add(self, *parts: str) -> None:
+        self.body.extend(parts)
+
+    def render(self) -> str:
+        return (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.w}" height="{self.h}" '
+            f'viewBox="0 0 {self.w} {self.h}" role="img" aria-label="{esc(self.title)}">\n'
+            f"<title>{esc(self.title)}</title>\n<style>{''.join(self.css)}</style>\n"
+            f"<defs>{''.join(self.defs)}</defs>\n" + "\n".join(self.body) + "\n</svg>\n"
+        )
+
+    # -------- shared pieces
+    def card(self, x, y, w, h) -> None:
+        pid = self.uid("dots")
+        self.defs.append(
+            f'<pattern id="{pid}" width="16" height="16" patternUnits="userSpaceOnUse">'
+            f'<circle cx="1" cy="1" r=".8" fill="#ffffff" fill-opacity=".05"/></pattern>')
+        self.add(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="14" fill="{BG0}" stroke="{LINE2}"/>',
+                 f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="14" fill="url(#{pid})"/>')
+        k = 14
+        for cx, cy, sx, sy in [(x, y, 1, 1), (x + w, y, -1, 1), (x, y + h, 1, -1), (x + w, y + h, -1, -1)]:
+            self.add(f'<path d="M{cx + sx * 4},{cy + sy * (k + 4)} V{cy + sy * 4} H{cx + sx * (k + 4)}" '
+                     f'fill="none" stroke="{ACC}" stroke-width="1.6" stroke-opacity=".8"/>')
+
+    def heading(self, x, y, fig: str, title: str, right: str = "", right_x: float | None = None) -> None:
+        self.add(f'<text x="{x}" y="{y}" font-family="{MONO}" font-size="10.5" letter-spacing="1.6" fill="{ACC}">{esc(fig)}</text>',
+                 f'<text x="{x + tw(fig, 10.5, True) + 22}" y="{y + 1}" font-family="{SANS}" font-size="16" font-weight="650" fill="{INK}">{esc(title)}</text>')
+        if right:
+            self.add(f'<text x="{right_x}" y="{y}" text-anchor="end" font-family="{MONO}" font-size="10" letter-spacing=".6" fill="{DIM}">{right}</text>')
+
+    def hline(self, x1, x2, y, dash: bool = False) -> None:
+        d = ' stroke-dasharray="2 4"' if dash else ""
+        self.add(f'<path d="M{x1},{y} H{x2}" stroke="{LINE2}"{d}/>')
+
+    def odometer(self, x, y, value: str, size: float, color: str, delay: float, weight: int = 700) -> float:
+        """Rolling digits. Returns the x where the number ends."""
+        cw, lh = size * 0.6, size * 1.2
+        cx = x
+        for i, ch in enumerate(value):
+            if ch.isdigit():
+                d = int(ch)
+                cid, kid = self.uid("oc"), self.uid("ok")
+                self.defs.append(f'<clipPath id="{cid}"><rect x="{cx - 1:.1f}" y="{y - size * .95:.1f}" width="{cw + 2:.1f}" height="{lh:.1f}"/></clipPath>')
+                self.css.append(f"@keyframes {kid}{{from{{transform:translateY(0)}}to{{transform:translateY(-{(10 + d) * lh:.1f}px)}}}}")
+                col = "".join(f'<tspan x="{cx:.1f}" y="{y + k * lh:.1f}">{k % 10}</tspan>' for k in range(20))
+                self.add(f'<g clip-path="url(#{cid})"><g style="animation:{kid} {1.5 + i * .12:.2f}s cubic-bezier(.15,.8,.2,1) {delay:.2f}s both">'
+                         f'<text font-family="{MONO}" font-size="{size}" font-weight="{weight}" fill="{color}">{col}</text></g></g>')
+            else:
+                self.add(f'<text x="{cx:.1f}" y="{y}" font-family="{MONO}" font-size="{size}" font-weight="{weight}" fill="{color}">{esc(ch)}</text>')
+            cx += cw
+        return cx
 
 
-ICONS = {
-    # 16x16 outline icons drawn with simple paths
-    "repo": "M3 2.5h8.5a1.5 1.5 0 0 1 1.5 1.5v9H4.5A1.5 1.5 0 0 1 3 11.5zM3 11.5A1.5 1.5 0 0 1 4.5 10H13M6 2.5v5l1.5-1 1.5 1v-5",
-    "star": "M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z",
-    "pulse": "M1.5 8.5h3l1.8-4.5 3 9 2-6.5 1.2 2h2",
-    "people": "M5.5 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM1 14c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4M11 7.5a2 2 0 1 0 0-4M12 10c1.8.3 3 1.6 3 4",
-    "pin": "M8 15s5-4.6 5-8.5A5 5 0 0 0 3 6.5C3 10.4 8 15 8 15zM8 8.3a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6z",
-    "trophy": "M5 2h6v4a3 3 0 0 1-6 0zM5 3.5H2.5a2.5 2.5 0 0 0 2.6 3M11 3.5h2.5a2.5 2.5 0 0 1-2.6 3M8 9v3M5.5 14h5M6.5 12h3",
-}
-
-
-def icon(name: str, x: float, y: float, color: str, scale: float = 1.0) -> str:
-    return (f'<path d="{ICONS[name]}" transform="translate({x},{y}) scale({scale})" fill="none" '
-            f'stroke="{color}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>')
-
-
-def sparkle(x: float, y: float, r: float, delay: float, color: str = MINT) -> str:
-    d = (f"M{x},{y - r} Q{x},{y} {x + r},{y} Q{x},{y} {x},{y + r} "
-         f"Q{x},{y} {x - r},{y} Q{x},{y} {x},{y - r}Z")
-    return f'<path class="tw" style="animation-delay:{delay}s" d="{d}" fill="{color}"/>'
-
-
-# ---------------------------------------------------------------- header
+# ------------------------------------------------------------------ header
 def render_header(cfg: dict, data: dict) -> str:
-    W, H = 840, 270
-    total = sum(d["count"] for d in data["days"])
-    title = cfg["title"]
-    css = f"""
-    .tw{{animation:tw 3.2s ease-in-out infinite;transform-box:fill-box;transform-origin:center}}
-    @keyframes tw{{0%,100%{{opacity:.15;transform:scale(.6)}}50%{{opacity:1;transform:scale(1)}}}}
-    .type{{animation:type 3.4s steps({len(title)}) .4s both}}
-    @keyframes type{{from{{width:0}}to{{width:{text_w(title, 14, True) + 6:.0f}px}}}}
-    .cur{{animation:blink 1s step-end infinite}}
-    @keyframes blink{{50%{{opacity:0}}}}
-    .fade{{animation:fade .8s ease-out both}}
-    @keyframes fade{{from{{opacity:0;transform:translateY(6px)}}to{{opacity:1;transform:none}}}}
-    .scan{{animation:scan 4s linear infinite}}
-    @keyframes scan{{from{{transform:translateY(0)}}to{{transform:translateY(190px)}}}}
-    .glow{{animation:glow 3s ease-in-out infinite}}
-    @keyframes glow{{50%{{stroke-opacity:.9}}}}
-    """
-    o = [svg_open(W, H, f"{cfg['name']}, {title}", css)]
-    o.append(f"""<defs>
-  <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="{TEAL}"/><stop offset=".55" stop-color="#1e3a5f"/><stop offset="1" stop-color="{PURPLE}"/>
-  </linearGradient>
-  <linearGradient id="name" x1="0" y1="0" x2="1" y2="0">
-    <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="{MINT}"/>
-  </linearGradient>
-  <radialGradient id="halo" cx=".5" cy=".45" r=".6">
-    <stop offset="0" stop-color="{TEAL}" stop-opacity=".38"/><stop offset="1" stop-color="{TEAL}" stop-opacity="0"/>
-  </radialGradient>
-  <pattern id="grid" width="18" height="18" patternUnits="userSpaceOnUse">
-    <path d="M18 0H0V18" fill="none" stroke="#ffffff" stroke-opacity=".035"/>
-  </pattern>
-  <clipPath id="typeclip"><rect class="type" x="34" y="128" height="22" width="0"/></clipPath>
-  <clipPath id="avclip"><rect x="626" y="44" width="186" height="200" rx="14"/></clipPath>
-</defs>""")
-    o.append(f'<rect x="1" y="1" width="{W - 2}" height="{H - 2}" rx="18" fill="{BG}" stroke="url(#edge)" stroke-width="1.5"/>')
-    o.append(f'<rect x="1" y="1" width="{W - 2}" height="{H - 2}" rx="18" fill="url(#grid)"/>')
+    W, H = 880, 340
+    X0, Y0, CW, CH = 10, 10, 860, 320
+    days = data["days"]
+    total = sum(d["count"] for d in days)
+    active = sum(1 for d in days if d["count"])
+    s = Svg(W, H, f"{cfg['name']}, {cfg.get('role', '')}")
+    s.card(X0, Y0, CW, CH)
 
-    # window chrome
-    for i, c in enumerate(["#ff5f57", "#febc2e", "#28c840"]):
-        o.append(f'<circle cx="{24 + i * 16}" cy="22" r="5" fill="{c}"/>')
-    o.append(f'<text x="80" y="26" font-family="{MONO}" font-size="11" fill="{MUTED}">~/{esc(cfg["username"])}/README.md</text>')
+    # ---- top strip
+    s.add(f'<circle class="ring" cx="36" cy="32" r="3.5" fill="none" stroke="{ACC}"/>',
+          f'<circle cx="36" cy="32" r="3.5" fill="{ACC}"/>',
+          f'<text x="48" y="36" font-family="{MONO}" font-size="10" letter-spacing="1.6" fill="{ACC}">LIVE</text>',
+          f'<text x="86" y="36" font-family="{MONO}" font-size="10" letter-spacing=".6" fill="{DIM}">{esc(cfg["username"].lower())} / profile.readme</text>')
+    right = f'{esc(cfg.get("coords", ""))}  ·  {esc(cfg.get("location", "").upper())}  ·  SYNCED {date.today():%d %b %Y}'.upper()
+    s.add(f'<text x="{X0 + CW - 26}" y="36" text-anchor="end" font-family="{MONO}" font-size="10" letter-spacing=".6" fill="{DIM}">{right}</text>')
+    s.hline(X0 + 1, X0 + CW - 1, 50)
 
-    # identity
-    o.append(f'<g class="fade"><text x="34" y="66" font-family="{MONO}" font-size="14" fill="{TEAL}">@{esc(cfg["username"])}</text>')
-    if cfg.get("badge"):
-        bx = 34 + text_w("@" + cfg["username"], 14, True) + 14
-        bw = text_w(cfg["badge"], 11) + 34
-        o.append(f'<rect x="{bx:.0f}" y="51" width="{bw:.0f}" height="21" rx="10.5" fill="#fbbf24" fill-opacity=".1" stroke="#fbbf24" stroke-opacity=".5"/>')
-        o.append(icon("trophy", bx + 8, 54, "#fbbf24", 0.85))
-        o.append(f'<text x="{bx + 25:.0f}" y="65.5" font-family="{SANS}" font-size="11" font-weight="600" fill="#fcd34d">{esc(cfg["badge"])}</text>')
-    o.append(f'<text x="32" y="110" font-family="{SANS}" font-size="38" font-weight="700" fill="url(#name)">{esc(cfg["name"])}</text></g>')
-    o.append(f'<g clip-path="url(#typeclip)"><text x="34" y="144" font-family="{MONO}" font-size="14" fill="{TEXT}" fill-opacity=".85">{esc(title)}</text></g>')
-    cx = 34 + text_w(title, 14, True) + 6
-    o.append(f'<rect class="cur" x="{cx:.0f}" y="131" width="8" height="16" fill="{TEAL}"/>')
+    # ---- identity column
+    L = 40
+    s.add(f'<text class="fi" x="{L}" y="86" font-family="{MONO}" font-size="10.5" letter-spacing="2" fill="{ACC}">{esc(cfg.get("role", ""))}</text>')
+    name = cfg["name"]
+    s.css.append(".ch{animation:ch .6s cubic-bezier(.2,.8,.2,1) both}"
+                 "@keyframes ch{0%{opacity:0;fill:" + ACC + "}60%{opacity:1;fill:" + ACC + "}100%{opacity:1;fill:" + INK + "}}")
+    spans = "".join(f'<tspan class="ch" style="animation-delay:{.25 + i * .045:.3f}s">{esc(c)}</tspan>' for i, c in enumerate(name))
+    dot = f'<tspan class="pulse" fill="{ACC}">.</tspan>'
+    s.add(f'<text x="{L - 2}" y="138" font-family="{SANS}" font-size="46" font-weight="750" letter-spacing="-1" fill="{INK}">{spans}{dot}</text>')
 
-    # meta line
-    x = 34
-    meta = []
-    if cfg.get("location"):
-        meta.append(("pin", cfg["location"], MUTED))
-    if cfg.get("status"):
-        meta.append(("dot", cfg["status"], "#4ade80"))
-    for kind, label, color in meta:
-        if x + 18 + text_w(label, 12.5) > 446:
-            break
-        if kind == "dot":
-            o.append(f'<circle cx="{x + 5}" cy="172" r="4" fill="{color}"><animate attributeName="opacity" values="1;.35;1" dur="2s" repeatCount="indefinite"/></circle>')
-        else:
-            o.append(icon(kind, x - 1, 164, color, 0.95))
-        o.append(f'<text x="{x + 18}" y="176" font-family="{SANS}" font-size="12.5" fill="{MUTED}">{esc(label)}</text>')
-        x += 18 + text_w(label, 12.5) + 14
+    tag = "> " + cfg.get("tagline", "")
+    twidth = tw(tag, 13, True)
+    cid = s.uid("type")
+    s.css.append(f"@keyframes {cid}k{{from{{width:0}}to{{width:{twidth + 4:.0f}px}}}}")
+    s.defs.append(f'<clipPath id="{cid}"><rect x="{L}" y="156" height="20" width="0" style="animation:{cid}k 2.6s steps({len(tag)}) 1s both"/></clipPath>')
+    s.add(f'<g clip-path="url(#{cid})"><text x="{L}" y="171" font-family="{MONO}" font-size="13" fill="{DIM}">{esc(tag)}</text></g>',
+          f'<rect class="cur" x="{L + twidth + 4:.0f}" y="160" width="7" height="14" fill="{ACC}"/>')
 
-    # pills, wrapped to the left column
-    px, py, maxx = 34, 196, 440
-    for p in cfg.get("pills", []):
-        pw = text_w(p, 11.5) + 26
-        if px + pw > maxx:
-            px, py = 34, py + 30
-            if py > 230:
-                break
-        o.append(f'<rect x="{px}" y="{py}" width="{pw:.0f}" height="22" rx="11" fill="{CARD}" stroke="{BORDER}"/>')
-        o.append(f'<circle cx="{px + 11}" cy="{py + 11}" r="3.5" fill="{LANG_FALLBACK.get(p, TEAL)}"/>')
-        o.append(f'<text x="{px + 19}" y="{py + 15}" font-family="{SANS}" font-size="11.5" fill="{TEXT}">{esc(p)}</text>')
-        px += pw + 8
+    fy = 206
+    for i, f in enumerate(cfg.get("facts", [])[:3]):
+        y = fy + i * 30
+        tone = f.get("tone")
+        color = WARM if tone == "warm" else INK
+        s.add(f'<g class="fu" style="animation-delay:{1.2 + i * .15:.2f}s">')
+        s.add(f'<text x="{L}" y="{y}" font-family="{MONO}" font-size="9.5" letter-spacing="1.6" fill="{FAINT}">{esc(f["key"])}</text>')
+        vx = L + 76
+        if tone == "live":
+            s.add(f'<circle class="ring" cx="{vx + 4}" cy="{y - 4}" r="3" fill="none" stroke="{LIVE}"/>',
+                  f'<circle cx="{vx + 4}" cy="{y - 4}" r="3" fill="{LIVE}"/>')
+            vx += 14
+        s.add(f'<text x="{vx}" y="{y}" font-family="{SANS}" font-size="13" fill="{color}">{esc(f["value"])}</text>')
+        s.add("</g>")
+        s.hline(L, 462, y + 11, dash=True)
 
-    # live stats column
-    stats = [("repo", data["repos"], "Repositories"), ("star", data["stars"], "Stars"),
-             ("pulse", total, "Contributions"), ("people", data["followers"], "Followers")]
-    sx, sy = 468, 70
-    o.append(f'<rect x="{sx - 16}" y="{sy - 26}" width="156" height="166" rx="12" fill="{PANEL}" stroke="{BORDER}"/>')
-    for i, (ic, val, label) in enumerate(stats):
-        y = sy + i * 38
-        o.append(f'<g class="fade" style="animation-delay:{.3 + i * .15}s">')
-        o.append(icon(ic, sx - 2, y - 8, TEAL))
-        o.append(f'<text x="{sx + 22}" y="{y + 4}" font-family="{SANS}" font-size="17" font-weight="700" fill="{TEXT}">{fmt(val)}</text>')
-        o.append(f'<text x="{sx + 22}" y="{y + 19}" font-family="{SANS}" font-size="10.5" fill="{MUTED}">{label}</text></g>')
-    o.append(f'<text x="{sx - 4}" y="{sy + 158}" font-family="{MONO}" font-size="9.5" fill="{MUTED}" fill-opacity=".8">live · {date.today():%d %b %Y}</text>')
+    sx = L
+    parts = []
+    for i, item in enumerate(cfg.get("stack", [])):
+        if i:
+            parts.append(f'<tspan fill="{ACC}">  /  </tspan>')
+        parts.append(f"<tspan>{esc(item)}</tspan>")
+    s.add(f'<text class="fi" style="animation-delay:1.8s" x="{sx}" y="306" font-family="{MONO}" font-size="11" fill="{DIM}">{"".join(parts)}</text>')
 
-    # avatar
-    o.append(f'<rect x="626" y="44" width="186" height="200" rx="14" fill="#08131c"/>')
-    o.append('<rect x="626" y="44" width="186" height="200" fill="url(#halo)"/>')
-    o.append(render_avatar(626, 44, 186, 200))
-    o.append(f'<g clip-path="url(#avclip)"><rect class="scan" x="626" y="40" width="186" height="10" fill="{MINT}" fill-opacity=".06"/></g>')
-    o.append(f'<rect class="glow" x="626" y="44" width="186" height="200" rx="14" fill="none" stroke="{TEAL}" stroke-opacity=".35" stroke-width="1.5"/>')
-    for i, (x, y, r) in enumerate([(612, 60, 6), (826, 98, 4.5), (604, 214, 4), (800, 30, 5), (830, 236, 3.5), (590, 132, 3)]):
-        o.append(sparkle(x, y, r, i * 0.55))
-    o.append("</svg>\n")
-    return "\n".join(o)
+    # ---- readouts column
+    RX = 494
+    s.add(f'<path d="M{RX - 14},66 V312" stroke="{LINE2}"/>', f'<path d="M{RX + 154},66 V312" stroke="{LINE2}"/>')
+    weeks = [sum(d["count"] for d in days[i:i + 7]) for i in range(0, len(days), 7)][-20:]
+    stats = [("CONTRIBUTIONS · 1Y", total), ("ACTIVE DAYS", active),
+             ("PUBLIC REPOS", data["repos"]), ("STARS EARNED", data["stars"])]
+    for i, (label, val) in enumerate(stats):
+        y = 70 + i * 61
+        s.add(f'<text x="{RX}" y="{y + 18}" font-family="{MONO}" font-size="9" letter-spacing="1.4" fill="{FAINT}">{label}</text>')
+        end = s.odometer(RX, y + 47, fmt(val), 24, INK, .5 + i * .15)
+        if i == 0 and weeks:
+            mx = max(weeks) or 1
+            gx0, gw, gh = max(end + 8, RX + 82), 54, 18
+            step = gw / max(1, len(weeks) - 1)
+            pts = " ".join(f"{gx0 + j * step:.1f},{y + 47 - gh * v / mx:.1f}" for j, v in enumerate(weeks))
+            plen = gw * 2.2
+            s.css.append(f".spark{{stroke-dasharray:{plen:.0f};animation:spark 2s ease-out 1s both}}@keyframes spark{{from{{stroke-dashoffset:{plen:.0f}}}to{{stroke-dashoffset:0}}}}")
+            s.add(f'<polyline class="spark" points="{pts}" fill="none" stroke="{ACC}" stroke-width="1.5" stroke-linejoin="round"/>')
+            lx, ly = pts.split()[-1].split(",")
+            s.add(f'<circle class="ring" cx="{lx}" cy="{ly}" r="2" fill="none" stroke="{ACC}"/>',
+                  f'<circle cx="{lx}" cy="{ly}" r="2" fill="{ACC}"/>')
+        if i < 3:
+            s.hline(RX, RX + 140, y + 60)
+
+    # ---- portrait
+    s.add(render_portrait(s, 664, 62, 186, 250))
+    return s.render()
 
 
-def render_avatar(x0: float, y0: float, w: float, h: float) -> str:
+def render_portrait(s: Svg, x0: float, y0: float, w: float, h: float) -> str:
+    out = []
+    clip = s.uid("pc")
+    s.defs.append(f'<clipPath id="{clip}"><rect x="{x0}" y="{y0}" width="{w}" height="{h}" rx="10"/></clipPath>')
+    glow = s.uid("pg")
+    s.defs.append(f'<radialGradient id="{glow}" cx=".5" cy=".42" r=".55"><stop offset="0" stop-color="{ACC}" stop-opacity=".16"/>'
+                  f'<stop offset="1" stop-color="{ACC}" stop-opacity="0"/></radialGradient>')
+    out.append(f'<rect x="{x0}" y="{y0}" width="{w}" height="{h}" rx="10" fill="{BG1}" stroke="{LINE2}"/>')
+    out.append(f'<rect x="{x0}" y="{y0}" width="{w}" height="{h}" rx="10" fill="url(#{glow})"/>')
+    out.append(f'<text x="{x0 + 12}" y="{y0 + 18}" font-family="{MONO}" font-size="8.5" letter-spacing="1.4" fill="{FAINT}">FIG. 0 — PORTRAIT</text>')
+
     path = ROOT / "avatar" / "pixels.json"
     if not path.exists():
-        return f'<text x="{x0 + w / 2}" y="{y0 + h / 2}" text-anchor="middle" font-family="{MONO}" font-size="11" fill="{MUTED}">run make_avatar.py</text>'
+        out.append(f'<text x="{x0 + w / 2}" y="{y0 + h / 2}" text-anchor="middle" font-family="{MONO}" font-size="10" fill="{DIM}">run make_avatar.py</text>')
+        return "\n".join(out)
     av = json.loads(path.read_text())
     cols, rows, px = av["cols"], av["rows"], av["pixels"]
-    cell = min((w - 16) / cols, (h - 14) / rows)
+    cell = min((w - 14) / cols, (h - 34) / rows)
     ox = x0 + (w - cols * cell) / 2
-    oy = y0 + h - rows * cell  # sit on the bottom edge like a bust
-    rng = random.Random(11)
-    out = ['<g>']
+    oy = y0 + h - rows * cell - 4
+    out.append(f'<text x="{x0 + w - 12}" y="{y0 + 18}" text-anchor="end" font-family="{MONO}" font-size="8.5" fill="{FAINT}">{cols}×{rows}</text>')
+
+    # orbit behind the head
+    hx, hy = ox + cols * cell / 2, oy + rows * cell * 0.36
+    s.css.append(".orb{transform-box:view-box;animation:orb 14s linear infinite}"
+                 f".orb{{transform-origin:{hx:.1f}px {hy:.1f}px}}@keyframes orb{{to{{transform:rotate(360deg)}}}}")
+    out.append(f'<g clip-path="url(#{clip})"><circle cx="{hx:.1f}" cy="{hy:.1f}" r="{cols * cell * .6:.1f}" fill="none" stroke="{LINE2}" stroke-dasharray="1 5"/>'
+               f'<g class="orb"><circle cx="{hx:.1f}" cy="{hy - cols * cell * .6:.1f}" r="2.6" fill="{ACC}"/></g></g>')
+
+    # dots, revealed in rings from the centre
+    rings = 9
+    groups: list[list[str]] = [[] for _ in range(rings)]
+    cxm, cym = cols / 2, rows * 0.4
+    maxd = math.hypot(cols / 2, rows * 0.6)
+    rng = random.Random(3)
     for r in range(rows):
         for c in range(cols):
             col = px[r][c]
             if not col:
                 continue
-            k = 0.88 + rng.random() * 0.24  # mosaic shimmer
-            rad = cell * (0.40 + rng.random() * 0.06)
-            out.append(f'<circle cx="{ox + c * cell + cell / 2:.1f}" cy="{oy + r * cell + cell / 2:.1f}" r="{rad:.2f}" fill="{shade(col, k)}"/>')
-    out.append("</g>")
-    return "".join(out)
+            L = lum(col)
+            if L < 0.12:  # lift near-black so hair and beard still read on the dark card
+                col = mix(col, "#46536a", 0.28)
+            rad = cell * (0.36 + 0.11 * min(1, L * 1.5)) * (0.95 + rng.random() * 0.08)
+            g = min(rings - 1, int(math.hypot(c - cxm, r - cym) / maxd * rings))
+            groups[g].append(f'<circle cx="{ox + c * cell + cell / 2:.1f}" cy="{oy + r * cell + cell / 2:.1f}" r="{rad:.2f}" fill="{col}"/>')
+    s.css.append(".dt{transform-box:fill-box;transform-origin:center;animation:dt .9s cubic-bezier(.2,.8,.2,1) both}"
+                 "@keyframes dt{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}")
+    for i, g in enumerate(groups):
+        if g:
+            out.append(f'<g class="dt" style="animation-delay:{.15 + i * .09:.2f}s">{"".join(g)}</g>')
+
+    # blink: skin-coloured dots flash over the eyes for a moment every few seconds
+    if av.get("blink"):
+        s.css.append(".bl{opacity:0;animation:bl 5.5s steps(1) 2.4s infinite}"
+                     "@keyframes bl{0%{opacity:0}94%{opacity:1}97%{opacity:0}}")
+        dots = "".join(
+            f'<circle cx="{ox + c * cell + cell / 2:.1f}" cy="{oy + r * cell + cell / 2:.1f}" r="{cell * .47:.2f}" fill="{colr}"/>'
+            for r, c, colr in av["blink"])
+        out.append(f'<g class="bl">{dots}</g>')
+
+    # scan line
+    s.css.append(f".scan{{animation:scan 5s linear infinite}}@keyframes scan{{from{{transform:translateY(0)}}to{{transform:translateY({h}px)}}}}")
+    out.append(f'<g clip-path="url(#{clip})"><rect class="scan" x="{x0}" y="{y0 - 2}" width="{w}" height="2" fill="{ACC}" fill-opacity=".25"/></g>')
+    return "\n".join(out)
 
 
-# ---------------------------------------------------------------- city
+# ------------------------------------------------------------------ city
 def render_city(cfg: dict, data: dict) -> str:
-    W, H = 840, 320
+    W, H = 880, 430
+    X0, Y0, CW, CH = 10, 10, 860, 410
     days = data["days"]
     total = sum(d["count"] for d in days)
     active = sum(1 for d in days if d["count"])
-    busiest = max(days, key=lambda d: d["count"]) if days else {"count": 0, "date": ""}
+    peak = max(days, key=lambda d: d["count"]) if days else {"count": 0, "date": date.today().isoformat()}
     cur, longest = streaks(days)
-    mx = max((d["count"] for d in days), default=0) or 1
+    nweeks_all = max(1, math.ceil(len(days) / 7))
+    s = Svg(W, H, f"Contribution city: {total} contributions in the last year")
+    s.card(X0, Y0, CW, CH)
+    s.heading(40, 42, "FIG. 1", "Contribution city", "LAST 365 DAYS  ·  HEIGHT ∝ √CONTRIBUTIONS", X0 + CW - 26)
+    s.hline(X0 + 1, X0 + CW - 1, 60)
 
-    css = """
-    .b{transform-box:fill-box;transform-origin:50% 100%;animation:rise 1s cubic-bezier(.2,.8,.2,1) both}
-    @keyframes rise{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-    .fade{animation:fade .8s ease-out both}
-    @keyframes fade{from{opacity:0}to{opacity:1}}
-    .cur{animation:blink 1s step-end infinite}
-    @keyframes blink{50%{opacity:0}}
-    """
-    o = [svg_open(W, H, f"3D contribution city: {total} contributions in the last year", css)]
-    o.append(f'<rect x="1" y="1" width="{W - 2}" height="{H - 2}" rx="18" fill="{BG}" stroke="{BORDER}" stroke-width="1.5"/>')
-    o.append(f'<text x="30" y="40" font-family="{MONO}" font-size="15" font-weight="700" fill="{TEXT}">{esc(cfg.get("city_title", "The city I built this year"))}</text>')
-    o.append(f'<text x="{W - 30}" y="40" text-anchor="end" font-family="{MONO}" font-size="12" fill="{TEAL}">&gt; github-city_<tspan class="cur">▌</tspan></text>')
-
-    # left stats
-    o.append(f'<g class="fade"><text x="30" y="88" font-family="{MONO}" font-size="11" letter-spacing="1.5" fill="{TEAL}">CONTRIBUTIONS</text>')
-    o.append(f'<text x="28" y="132" font-family="{SANS}" font-size="44" font-weight="800" fill="{TEXT}">{fmt(total)}</text>')
-    rows = [("active days", active), ("busiest day", busiest["count"]),
-            ("current streak", f"{cur}d"), ("longest streak", f"{longest}d")]
+    # ---- readout column
+    L, R = 40, 236
+    s.add(f'<text x="{L}" y="94" font-family="{MONO}" font-size="9.5" letter-spacing="1.6" fill="{FAINT}">TOTAL</text>')
+    s.odometer(L, 140, fmt(total), 40, INK, .3, 800)
+    s.add(f'<text x="{L}" y="162" font-family="{SANS}" font-size="12" fill="{DIM}">contributions in the last year</text>')
+    rows = [("active days", f"{active}"), ("peak day", f"{peak['count']}"),
+            ("current streak", f"{cur}d"), ("longest streak", f"{longest}d"),
+            ("weekly average", f"{total / nweeks_all:.1f}")]
     for i, (k, v) in enumerate(rows):
-        y = 166 + i * 24
-        o.append(f'<text x="30" y="{y}" font-family="{SANS}" font-size="12.5" fill="{MUTED}">{k}</text>')
-        o.append(f'<text x="200" y="{y}" text-anchor="end" font-family="{MONO}" font-size="12.5" fill="{TEXT}">{v}</text>')
-    if busiest["date"]:
-        bd = date.fromisoformat(busiest["date"])
-        o.append(f'<text x="30" y="{166 + 4 * 24 + 4}" font-family="{MONO}" font-size="10" fill="{MUTED}" fill-opacity=".7">peak · {bd:%d %b %Y}</text>')
-    o.append("</g>")
+        y = 194 + i * 26
+        s.add(f'<g class="fu" style="animation-delay:{.6 + i * .1:.2f}s">'
+              f'<text x="{L}" y="{y}" font-family="{SANS}" font-size="12.5" fill="{DIM}">{k}</text>'
+              f'<text x="{R}" y="{y}" text-anchor="end" font-family="{MONO}" font-size="12.5" fill="{INK}">{v}</text></g>')
+        s.hline(L, R, y + 9, dash=True)
 
-    # isometric city
+    # weekday rhythm
+    wd = [0] * 7
+    for d in days:
+        wd[d["weekday"]] += d["count"]
+    mx = max(wd) or 1
+    s.add(f'<text x="{L}" y="342" font-family="{MONO}" font-size="9" letter-spacing="1.4" fill="{FAINT}">WEEKLY RHYTHM</text>')
+    bw = (R - L - 6 * 8) / 7
+    for i, v in enumerate(wd):
+        bh = max(2, 36 * v / mx)
+        x = L + i * (bw + 8)
+        s.add(f'<rect x="{x:.1f}" y="352" width="{bw:.1f}" height="36" rx="2" fill="{BG1}"/>',
+              f'<rect class="gy" style="animation-delay:{.8 + i * .06:.2f}s" x="{x:.1f}" y="{388 - bh:.1f}" width="{bw:.1f}" height="{bh:.1f}" rx="2" fill="{ACC}" fill-opacity="{.35 + .65 * v / mx:.2f}"/>',
+              f'<text x="{x + bw / 2:.1f}" y="402" text-anchor="middle" font-family="{MONO}" font-size="8.5" fill="{FAINT}">{"SMTWTFS"[i]}</text>')
+    s.add(f'<path d="M{R + 26},76 V402" stroke="{LINE2}"/>')
+
+    # ---- isometric city
     weeks: dict[int, list[dict]] = {}
     first = date.fromisoformat(days[0]["date"]) if days else date.today()
     for d in days:
-        wi = (date.fromisoformat(d["date"]) - first).days // 7
-        weeks.setdefault(wi, []).append(d)
+        weeks.setdefault((date.fromisoformat(d["date"]) - first).days // 7, []).append(d)
     nweeks = max(weeks) + 1 if weeks else 53
-
-    ux, uy = 9.0, -2.9   # one week step: right and up
-    vx, vy = 5.6, 3.7    # one weekday step: right and down
-    ox, oy = 238, 250
-    gap = 0.14
-    levels = ["#1b3a44", "#0f766e", "#14b8a6", "#2dd4bf", "#7af5e1"]
+    ux, uy, vx, vy = 9.3, -2.85, 6.1, 3.7
+    ox, oy = 292, 316
+    top_h = 84
+    cmax = max((d["count"] for d in days), default=0) or 1
 
     def P(w, d):
         return (ox + w * ux + d * vx, oy + w * uy + d * vy)
@@ -482,123 +584,175 @@ def render_city(cfg: dict, data: dict) -> str:
     def poly(pts, fill, extra=""):
         return f'<polygon points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in pts)}" fill="{fill}"{extra}/>'
 
-    floor = [P(-0.6, -0.6), P(nweeks + 0.6, -0.6), P(nweeks + 0.6, 7.6), P(-0.6, 7.6)]
-    o.append(poly(floor, "#0d2230", f' stroke="{BORDER}" stroke-width="1"'))
+    s.add(poly([P(-.8, -.8), P(nweeks + .8, -.8), P(nweeks + .8, 7.8), P(-.8, 7.8)], "#0b1820", f' stroke="{LINE2}"'))
+    # month ticks along the front edge
+    seen = set()
+    for wi in sorted(weeks):
+        m = date.fromisoformat(weeks[wi][0]["date"])
+        key = (m.year, m.month)
+        if key in seen or wi == 0:
+            seen.add(key)
+            continue
+        seen.add(key)
+        a, b = P(wi, 7.8), P(wi, 8.5)
+        s.add(f'<path d="M{a[0]:.1f},{a[1]:.1f} L{b[0]:.1f},{b[1]:.1f}" stroke="{FAINT}"/>',
+              f'<text x="{b[0] + 2:.1f}" y="{b[1] + 11:.1f}" font-family="{MONO}" font-size="8.5" letter-spacing=".8" fill="{FAINT}">{m:%b}</text>'.replace(m.strftime('%b'), m.strftime('%b').upper()))
 
-    cells = []
-    for wi, wdays in weeks.items():
-        for d in wdays:
-            cells.append((wi, d["weekday"], d["count"]))
+    cells = [(wi, d["weekday"], d["count"], d["date"]) for wi, wd_ in weeks.items() for d in wd_]
     cells.sort(key=lambda c: (c[1] - c[0], c[1]))
-
-    for w, d, c in cells:
-        a, b = w + gap, w + 1 - gap
-        e, f = d + gap, d + 1 - gap
+    s.css.append(".sh{opacity:0;animation:sh 7s ease-in-out infinite}@keyframes sh{0%,100%{opacity:0}6%{opacity:.55}14%{opacity:0}}")
+    gap = .13
+    peak_roof = None
+    last_date = days[-1]["date"] if days else ""
+    beacon = None
+    for w, d, c, ds in cells:
+        a, b, e, f = w + gap, w + 1 - gap, d + gap, d + 1 - gap
         p1, p2, p3, p4 = P(a, e), P(b, e), P(b, f), P(a, f)
         if c == 0:
-            o.append(poly([p1, p2, p3, p4], "#13303d"))
+            s.add(poly([p1, p2, p3, p4], CITY_LEVELS[0]))
+            if ds == last_date:
+                beacon = ((p1[0] + p3[0]) / 2, (p1[1] + p3[1]) / 2)
             continue
-        ratio = math.sqrt(c / mx)
-        lvl = min(4, 1 + int(ratio * 4))
-        top = levels[lvl]
-        h = 4 + 78 * ratio
+        ratio = math.sqrt(c / cmax)
+        top = CITY_LEVELS[min(4, 1 + int(ratio * 3.999))]
+        is_peak = ds == peak["date"]
+        if is_peak:
+            top = WARM
+        h = 3 + top_h * ratio
         up = lambda p: (p[0], p[1] - h)
-        left = [p1, p4, up(p4), up(p1)]
-        front = [p4, p3, up(p3), up(p4)]
         roof = [up(p1), up(p2), up(p3), up(p4)]
-        o.append(f'<g class="b" style="animation-delay:{w * 0.025:.2f}s">'
-                 + poly(left, shade(top, 0.55)) + poly(front, shade(top, 0.78)) + poly(roof, top)
-                 + "</g>")
+        s.add(f'<g class="gy" style="animation-delay:{.2 + w * .022:.2f}s">'
+              + poly([p1, p4, up(p4), up(p1)], shade(top, .5))
+              + poly([p4, p3, up(p3), up(p4)], shade(top, .72))
+              + poly(roof, top)
+              + poly(roof, "#ffffff", f' class="sh" style="animation-delay:{2.5 + w * .045:.2f}s"')
+              + "</g>")
+        if is_peak:
+            peak_roof = ((roof[0][0] + roof[2][0]) / 2, (roof[0][1] + roof[2][1]) / 2)
+        if ds == last_date:
+            beacon = ((roof[0][0] + roof[2][0]) / 2, (roof[0][1] + roof[2][1]) / 2)
+
+    if peak_roof:
+        px_, py_ = peak_roof
+        ly = max(84, py_ - 34)
+        label = f"PEAK · {peak['count']}  {date.fromisoformat(peak['date']):%d %b}".upper()
+        lw = tw(label, 9.5, True) + 16
+        lx = min(px_ - 8, X0 + CW - 24 - lw)
+        s.add(f'<g class="fi" style="animation-delay:2.2s"><path d="M{px_:.1f},{py_:.1f} V{ly + 6:.1f}" stroke="{WARM}" stroke-dasharray="2 2"/>'
+              f'<circle cx="{px_:.1f}" cy="{py_:.1f}" r="2" fill="{WARM}"/>'
+              f'<rect x="{lx:.1f}" y="{ly - 12:.1f}" width="{lw:.1f}" height="18" rx="3" fill="{BG0}" stroke="{WARM}" stroke-opacity=".6"/>'
+              f'<text x="{lx + 8:.1f}" y="{ly + 1:.1f}" font-family="{MONO}" font-size="9.5" letter-spacing=".8" fill="{WARM}">{label}</text></g>')
+    if beacon:
+        bx, by = beacon
+        s.add(f'<circle class="ring" cx="{bx:.1f}" cy="{by:.1f}" r="3" fill="none" stroke="{ACC}"/>',
+              f'<circle cx="{bx:.1f}" cy="{by:.1f}" r="2.5" fill="{ACC}"/>',
+              f'<text x="{bx:.1f}" y="{by - 10:.1f}" text-anchor="middle" font-family="{MONO}" font-size="8.5" letter-spacing=".8" fill="{ACC}">TODAY</text>')
 
     # legend
-    lx = W - 190
-    o.append(f'<text x="{lx}" y="{H - 22}" font-family="{SANS}" font-size="10.5" fill="{MUTED}">less</text>')
-    for i, c in enumerate(["#13303d"] + levels[1:]):
-        o.append(f'<rect x="{lx + 30 + i * 18}" y="{H - 32}" width="12" height="12" rx="2" fill="{c}"/>')
-    o.append(f'<text x="{lx + 30 + 5 * 18 + 4}" y="{H - 22}" font-family="{SANS}" font-size="10.5" fill="{MUTED}">more</text>')
-    o.append("</svg>\n")
-    return "\n".join(o)
+    lx = X0 + CW - 172
+    s.add(f'<text x="{lx}" y="400" font-family="{MONO}" font-size="8.5" letter-spacing="1" fill="{FAINT}">LESS</text>')
+    for i, c in enumerate(CITY_LEVELS):
+        s.add(f'<rect x="{lx + 32 + i * 16}" y="391" width="11" height="11" rx="2" fill="{c}"/>')
+    s.add(f'<text x="{lx + 32 + 5 * 16 + 4}" y="400" font-family="{MONO}" font-size="8.5" letter-spacing="1" fill="{FAINT}">MORE</text>')
+    return s.render()
 
 
-# ---------------------------------------------------------------- panels
+# ------------------------------------------------------------------ panels
 def render_panels(cfg: dict, data: dict) -> str:
-    W, H = 840, 330
-    css = """
-    .bar{transform-box:fill-box;transform-origin:0 50%;animation:grow 1.2s cubic-bezier(.2,.8,.2,1) both}
-    @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-    .ring{animation:ring 1.6s ease-out both}
-    .fade{animation:fade .8s ease-out both}
-    @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-    .cur{animation:blink 1s step-end infinite}
-    @keyframes blink{50%{opacity:0}}
-    """
-    o = [svg_open(W, H, "Language stack and featured projects", css)]
+    W, H = 880, 430
+    s = Svg(W, H, "Language stack and selected work")
 
-    # ---- language stack
-    LW = 300
-    o.append(f'<rect x="1" y="1" width="{LW}" height="{H - 2}" rx="18" fill="{BG}" stroke="{BORDER}" stroke-width="1.5"/>')
-    o.append(f'<text x="24" y="38" font-family="{SANS}" font-size="16" font-weight="700" fill="{TEXT}">Language Stack</text>')
-    o.append(f'<text x="24" y="56" font-family="{SANS}" font-size="10.5" fill="{TEAL}">repository-weighted technologies</text>')
-    o.append(f'<text x="{LW - 20}" y="38" text-anchor="end" font-family="{MONO}" font-size="11" fill="{TEAL}">&gt; stack.scan<tspan class="cur">_</tspan></text>')
+    # ---- language stack card
+    X0, Y0, LW, CH = 10, 10, 296, 410
+    s.card(X0, Y0, LW, CH)
+    s.heading(X0 + 26, 42, "FIG. 2", "Language stack")
+    s.hline(X0 + 1, X0 + LW - 1, 60)
+    s.add(f'<text x="{X0 + 26}" y="84" font-family="{MONO}" font-size="9" letter-spacing="1.4" fill="{FAINT}">BYTES OF CODE · PUBLIC REPOS</text>')
 
     excl = set(cfg.get("exclude_languages", []))
     langs = sorted(((n, b) for n, b in data["lang_bytes"].items() if n not in excl), key=lambda t: -t[1])
     langs = langs[: cfg.get("top_languages", 5)]
     tot = sum(b for _, b in langs) or 1
+    bx, bwid = X0 + 26, LW - 52
+    clip = s.uid("lb")
+    s.defs.append(f'<clipPath id="{clip}"><rect class="gx" style="animation-delay:.3s" x="{bx}" y="96" width="{bwid}" height="10" rx="3"/></clipPath>')
+    segs, cx = [], bx
+    for n, b in langs:
+        wseg = bwid * b / tot
+        color = data["lang_color"].get(n) or LANG_FALLBACK.get(n, ACC)
+        segs.append(f'<rect x="{cx:.1f}" y="96" width="{max(0, wseg - 2):.1f}" height="10" fill="{color}"/>')
+        cx += wseg
+    s.add(f'<g clip-path="url(#{clip})">{"".join(segs)}</g>')
+
     for i, (n, b) in enumerate(langs):
-        y = 96 + i * 44
+        y = 146 + i * 50
         pct = 100 * b / tot
-        color = data["lang_color"].get(n) or LANG_FALLBACK.get(n, TEAL)
-        o.append(f'<circle cx="30" cy="{y - 4}" r="5" fill="{color}"/>')
-        o.append(f'<text x="44" y="{y}" font-family="{SANS}" font-size="13" fill="{TEXT}">{esc(n)}</text>')
-        o.append(f'<text x="{LW - 24}" y="{y}" text-anchor="end" font-family="{MONO}" font-size="12" fill="{color if color != "#083fa1" else MUTED}">{pct:.0f}%</text>')
-        o.append(f'<rect x="24" y="{y + 10}" width="{LW - 48}" height="7" rx="3.5" fill="{CARD}"/>')
-        bw = max(7, (LW - 48) * pct / 100)
-        o.append(f'<rect class="bar" style="animation-delay:{.2 + i * .12:.2f}s" x="24" y="{y + 10}" width="{bw:.1f}" height="7" rx="3.5" fill="{color}"/>')
+        color = data["lang_color"].get(n) or LANG_FALLBACK.get(n, ACC)
+        s.add(f'<g class="fu" style="animation-delay:{.4 + i * .1:.2f}s">'
+              f'<rect x="{bx}" y="{y - 9}" width="8" height="8" rx="1.5" fill="{color}"/>'
+              f'<text x="{bx + 16}" y="{y}" font-family="{SANS}" font-size="13.5" fill="{INK}">{esc(n)}</text>'
+              f'<text x="{bx + bwid}" y="{y}" text-anchor="end" font-family="{MONO}" font-size="12" fill="{INK}">{pct:.1f}%</text>'
+              f'<text x="{bx + 16}" y="{y + 15}" font-family="{MONO}" font-size="9" fill="{FAINT}">{size_str(b)}</text>'
+              f'<rect x="{bx}" y="{y + 22}" width="{bwid}" height="3" rx="1.5" fill="{BG1}"/>'
+              f'<rect class="gx" style="animation-delay:{.6 + i * .1:.2f}s" x="{bx}" y="{y + 22}" width="{max(3, bwid * pct / 100):.1f}" height="3" rx="1.5" fill="{color}"/></g>')
+    if excl:
+        s.add(f'<text x="{bx}" y="{Y0 + CH - 16}" font-family="{MONO}" font-size="8.5" fill="{FAINT}">markup &amp; config excluded</text>')
 
-    # ---- projects
-    X0 = LW + 16
-    PW = W - X0 - 1
-    o.append(f'<rect x="{X0}" y="1" width="{PW}" height="{H - 2}" rx="18" fill="{BG}" stroke="{BORDER}" stroke-width="1.5"/>')
-    o.append(f'<text x="{X0 + 22}" y="38" font-family="{SANS}" font-size="16" font-weight="700" fill="{TEXT}">Projects.list</text>')
-    o.append(f'<text x="{X0 + 22}" y="56" font-family="{MONO}" font-size="10.5" fill="{MUTED}">./projects.sh --featured</text>')
-    o.append(f'<text x="{W - 22}" y="38" text-anchor="end" font-family="{MONO}" font-size="11" fill="{TEAL}">{len(data["featured"])} pinned</text>')
+    # ---- selected work card
+    PX = X0 + LW + 18
+    PW = W - 10 - PX
+    s.card(PX, Y0, PW, CH)
+    s.heading(PX + 26, 42, "TABLE 1", "Selected work", "./projects.sh --featured", PX + PW - 26)
+    s.hline(PX + 1, PX + PW - 1, 60)
 
-    cw, ch, gx, gy = (PW - 22 * 2 - 12) / 2, 118, 12, 12
+    gap = 16
+    cw = (PW - 52 - gap) / 2
+    chh = (CH - 50 - 26 - gap) / 2
     for i, p in enumerate(data["featured"][:4]):
-        cx = X0 + 22 + (i % 2) * (cw + gx)
-        cy = 72 + (i // 2) * (ch + gy)
-        o.append(f'<g class="fade" style="animation-delay:{.2 + i * .15:.2f}s">')
-        o.append(f'<rect x="{cx:.1f}" y="{cy}" width="{cw:.1f}" height="{ch}" rx="12" fill="{CARD}" stroke="{BORDER}"/>')
-        o.append(f'<circle cx="{cx + 16:.1f}" cy="{cy + 20}" r="4" fill="{p["color"]}"/>')
-        o.append(f'<text x="{cx + 27:.1f}" y="{cy + 24}" font-family="{SANS}" font-size="13" font-weight="700" fill="{TEXT}">{esc(p["name"])}</text>')
-        for j, line in enumerate(wrap(p["description"], 27, 2)):
-            o.append(f'<text x="{cx + 14:.1f}" y="{cy + 44 + j * 14}" font-family="{SANS}" font-size="10.5" fill="{MUTED}">{esc(line)}</text>')
+        cx = PX + 26 + (i % 2) * (cw + gap)
+        cy = 80 + (i // 2) * (chh + gap)
+        s.add(f'<g class="fu" style="animation-delay:{.3 + i * .14:.2f}s">')
+        s.add(f'<rect x="{cx:.1f}" y="{cy:.1f}" width="{cw:.1f}" height="{chh:.1f}" rx="10" fill="{BG1}" stroke="{LINE2}"/>')
+        s.add(f'<text x="{cx + 16:.1f}" y="{cy + 24:.1f}" font-family="{MONO}" font-size="9.5" letter-spacing="1.2" fill="{FAINT}">{i + 1:02d}</text>')
+        s.add(f'<circle cx="{cx + cw - 16 - tw(p["language"], 9.5, True) - 9:.1f}" cy="{cy + 20.5:.1f}" r="3.5" fill="{p["color"]}"/>'
+              f'<text x="{cx + cw - 16:.1f}" y="{cy + 24:.1f}" text-anchor="end" font-family="{MONO}" font-size="9.5" fill="{DIM}">{esc(p["language"])}</text>')
+        name = p["name"] if len(p["name"]) <= 24 else p["name"][:23] + "…"
+        s.add(f'<text x="{cx + 16:.1f}" y="{cy + 50:.1f}" font-family="{SANS}" font-size="16" font-weight="650" fill="{INK}">{esc(name)}</text>')
+        for j, line in enumerate(wrap(p["description"], int((cw - 32) / 5.7), 3)):
+            s.add(f'<text x="{cx + 16:.1f}" y="{cy + 70 + j * 14.5:.1f}" font-family="{SANS}" font-size="11.5" fill="{DIM}">{esc(line)}</text>')
+        tags = "   ".join("#" + t for t in p["tags"][:3])
+        s.add(f'<text x="{cx + 16:.1f}" y="{cy + chh - 44:.1f}" font-family="{MONO}" font-size="10" fill="{ACC}">{esc(tags)}</text>')
 
-        # ring: share of the repo's primary language
-        rx, ry, rr = cx + cw - 30, cy + 34, 17
-        circ = 2 * math.pi * rr
-        o.append(f'<circle cx="{rx:.1f}" cy="{ry}" r="{rr}" fill="none" stroke="{BG}" stroke-width="4"/>')
-        o.append(f'<circle class="ring" cx="{rx:.1f}" cy="{ry}" r="{rr}" fill="none" stroke="{p["color"]}" stroke-width="4" '
-                 f'stroke-linecap="round" stroke-dasharray="{circ * p["share"] / 100:.1f} {circ:.1f}" '
-                 f'transform="rotate(-90 {rx:.1f} {ry})"/>')
-        o.append(f'<text x="{rx:.1f}" y="{ry + 4}" text-anchor="middle" font-family="{MONO}" font-size="10" fill="{TEXT}">{p["share"]}%</text>')
-        o.append(f'<text x="{rx:.1f}" y="{ry + rr + 13}" text-anchor="middle" font-family="{SANS}" font-size="8.5" fill="{MUTED}">{esc(p["language"])}</text>')
-
-        tx = cx + 14
-        for t in p["tags"][:2]:
-            tw = text_w(t, 9.5) + 14
-            o.append(f'<rect x="{tx:.1f}" y="{cy + 74}" width="{tw:.0f}" height="17" rx="8.5" fill="none" stroke="{TEAL}" stroke-opacity=".45"/>')
-            o.append(f'<text x="{tx + 7:.1f}" y="{cy + 86}" font-family="{SANS}" font-size="9.5" fill="{MINT}">{esc(t)}</text>')
-            tx += tw + 6
-        o.append(icon("star", cx + 13, cy + 97, MUTED, 0.7))
-        o.append(f'<text x="{cx + 28:.1f}" y="{cy + 107}" font-family="{SANS}" font-size="10" fill="{MUTED}">{p["stars"]}  ·  {ago(p["pushed"])}</text>')
-        o.append("</g>")
-    o.append("</svg>\n")
-    return "\n".join(o)
+        # language mix bar
+        mclip = s.uid("mx")
+        mw = cw - 32
+        s.defs.append(f'<clipPath id="{mclip}"><rect class="gx" style="animation-delay:{.7 + i * .14:.2f}s" x="{cx + 16:.1f}" y="{cy + chh - 32:.1f}" width="{mw:.1f}" height="4" rx="2"/></clipPath>')
+        segs, mx_ = [], cx + 16
+        for _, col, frac in p["mix"]:
+            segs.append(f'<rect x="{mx_:.1f}" y="{cy + chh - 32:.1f}" width="{max(0, mw * frac - 1.5):.1f}" height="4" fill="{col}"/>')
+            mx_ += mw * frac
+        s.add(f'<rect x="{cx + 16:.1f}" y="{cy + chh - 32:.1f}" width="{mw:.1f}" height="4" rx="2" fill="{BG0}"/>',
+              f'<g clip-path="url(#{mclip})">{"".join(segs)}</g>')
+        s.add(f'<text x="{cx + 16:.1f}" y="{cy + chh - 14:.1f}" font-family="{MONO}" font-size="9.5" fill="{FAINT}">★ {p["stars"]}</text>'
+              f'<text x="{cx + cw - 16:.1f}" y="{cy + chh - 14:.1f}" text-anchor="end" font-family="{MONO}" font-size="9.5" fill="{FAINT}">pushed {ago(p["pushed"])}</text>')
+        s.add("</g>")
+    return s.render()
 
 
-# ---------------------------------------------------------------- main
+# ------------------------------------------------------------------ link buttons
+def render_button(label: str, idx: int) -> str:
+    W, H = 200, 46
+    s = Svg(W, H, label.title())
+    s.add(f'<rect x="1" y="1" width="{W - 2}" height="{H - 2}" rx="10" fill="{BG0}" stroke="{LINE2}"/>',
+          f'<path d="M5,15 V5 H15" fill="none" stroke="{ACC}" stroke-width="1.5"/>',
+          f'<path d="M{W - 5},{H - 15} V{H - 5} H{W - 15}" fill="none" stroke="{ACC}" stroke-width="1.5"/>',
+          f'<text x="20" y="28" font-family="{MONO}" font-size="9.5" fill="{FAINT}">{idx:02d}</text>',
+          f'<text x="44" y="28" font-family="{MONO}" font-size="12" letter-spacing="1.6" fill="{INK}">{esc(label)}</text>',
+          f'<text x="{W - 20}" y="28" text-anchor="end" font-family="{MONO}" font-size="13" fill="{ACC}">↗</text>')
+    return s.render()
+
+
+# ------------------------------------------------------------------ main
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--demo", action="store_true", help="render with sample data, no token")
@@ -614,8 +768,12 @@ def main() -> None:
         data = fetch_live(cfg, token)
 
     ASSETS.mkdir(exist_ok=True)
-    for name, fn in [("header.svg", render_header), ("city.svg", render_city), ("panels.svg", render_panels)]:
-        (ASSETS / name).write_text(fn(cfg, data), encoding="utf-8")
+    outputs = {"header.svg": render_header(cfg, data), "city.svg": render_city(cfg, data),
+               "panels.svg": render_panels(cfg, data)}
+    for i, link in enumerate(cfg.get("links", []), 1):
+        outputs[f"btn-{link['label'].lower()}.svg"] = render_button(link["label"], i)
+    for name, svg in outputs.items():
+        (ASSETS / name).write_text(svg, encoding="utf-8")
         print(f"wrote assets/{name}")
 
 
