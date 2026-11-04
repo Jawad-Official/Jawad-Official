@@ -17,12 +17,15 @@ Standard library only, so the Action needs no pip install.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import math
 import os
 import random
+import struct
 import sys
 import urllib.request
+import zlib
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -45,7 +48,9 @@ LIVE = "#4ade80"
 SANS = "-apple-system, 'Segoe UI', Ubuntu, 'Helvetica Neue', Arial, sans-serif"
 MONO = "'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
 
-PAD = -9  # trims the transparent margin above and below each card (negative = tighter)
+PAD = -4  # cards sit 10 px inset in their canvas; -4 leaves 6 px, so stacked cards end up ~10 px apart on GitHub
+GAP = 12  # space between neighbouring cards; renders ~10 px on GitHub, matching the vertical gaps
+IN_L, IN_R = 40, 840  # inner content edges shared by every card (30 px card padding)
 
 CITY_LEVELS = ["#11242c", "#0e5a50", "#119482", "#22c7a6", "#7ff5d8"]
 
@@ -382,35 +387,39 @@ def render_header(cfg: dict, data: dict) -> str:
     s.card(X0, Y0, CW, CH)
 
     # ---- top strip
-    s.add(f'<circle class="ring" cx="36" cy="32" r="3.5" fill="none" stroke="{ACC}"/>',
-          f'<circle cx="36" cy="32" r="3.5" fill="{ACC}"/>',
-          f'<text x="48" y="36" font-family="{MONO}" font-size="10" letter-spacing="1.6" fill="{ACC}">LIVE</text>',
-          f'<text x="86" y="36" font-family="{MONO}" font-size="10" letter-spacing=".6" fill="{DIM}">{esc(cfg["username"].lower())} / profile.readme</text>')
+    s.add(f'<circle class="ring" cx="{IN_L + 4}" cy="31" r="3.5" fill="none" stroke="{ACC}"/>',
+          f'<circle cx="{IN_L + 4}" cy="31" r="3.5" fill="{ACC}"/>',
+          f'<text x="{IN_L + 16}" y="35" font-family="{MONO}" font-size="10" letter-spacing="1.6" fill="{ACC}">LIVE</text>',
+          f'<text x="{IN_L + 54}" y="35" font-family="{MONO}" font-size="10" letter-spacing=".6" fill="{DIM}">{esc(cfg["username"].lower())} / profile.readme</text>')
     right = f'{esc(cfg.get("coords", ""))}  ·  {esc(cfg.get("location", "").upper())}  ·  SYNCED {date.today():%d %b %Y}'.upper()
-    s.add(f'<text x="{X0 + CW - 26}" y="36" text-anchor="end" font-family="{MONO}" font-size="10" letter-spacing=".6" fill="{DIM}">{right}</text>')
+    s.add(f'<text x="{IN_R}" y="35" text-anchor="end" font-family="{MONO}" font-size="10" letter-spacing=".6" fill="{DIM}">{right}</text>')
     s.hline(X0 + 1, X0 + CW - 1, 50)
 
+    # ---- column grid: identity | readouts | portrait, 16 px gutters around each divider
+    TOP, BOT = 66, 314
+    L, L_END = IN_L, 452
+    D1, RX, R_END, D2 = 470, 486, 616, 632
+    PX0, PW_ = 648, IN_R - 648
+
     # ---- identity column
-    L = 40
     s.add(f'<text class="fi" x="{L}" y="86" font-family="{MONO}" font-size="10.5" letter-spacing="2" fill="{ACC}">{esc(cfg.get("role", ""))}</text>')
     name = cfg["name"]
     s.css.append(".ch{animation:ch .6s cubic-bezier(.2,.8,.2,1) both}"
                  "@keyframes ch{0%{opacity:0;fill:" + ACC + "}60%{opacity:1;fill:" + ACC + "}100%{opacity:1;fill:" + INK + "}}")
     spans = "".join(f'<tspan class="ch" style="animation-delay:{.25 + i * .045:.3f}s">{esc(c)}</tspan>' for i, c in enumerate(name))
     dot = f'<tspan class="pulse" fill="{ACC}">.</tspan>'
-    s.add(f'<text x="{L - 2}" y="138" font-family="{SANS}" font-size="46" font-weight="750" letter-spacing="-1" fill="{INK}">{spans}{dot}</text>')
+    s.add(f'<text x="{L - 2}" y="136" font-family="{SANS}" font-size="44" font-weight="750" letter-spacing="-1" fill="{INK}">{spans}{dot}</text>')
 
     tag = "> " + cfg.get("tagline", "")
     twidth = tw(tag, 13, True)
     cid = s.uid("type")
     s.css.append(f"@keyframes {cid}k{{from{{width:0}}to{{width:{twidth + 4:.0f}px}}}}")
-    s.defs.append(f'<clipPath id="{cid}"><rect x="{L}" y="156" height="20" width="0" style="animation:{cid}k 2.6s steps({len(tag)}) 1s both"/></clipPath>')
-    s.add(f'<g clip-path="url(#{cid})"><text x="{L}" y="171" font-family="{MONO}" font-size="13" fill="{DIM}">{esc(tag)}</text></g>',
-          f'<rect class="cur" x="{L + twidth + 4:.0f}" y="160" width="7" height="14" fill="{ACC}"/>')
+    s.defs.append(f'<clipPath id="{cid}"><rect x="{L}" y="154" height="20" width="0" style="animation:{cid}k 2.6s steps({len(tag)}) 1s both"/></clipPath>')
+    s.add(f'<g clip-path="url(#{cid})"><text x="{L}" y="169" font-family="{MONO}" font-size="13" fill="{DIM}">{esc(tag)}</text></g>',
+          f'<rect class="cur" x="{L + twidth + 4:.0f}" y="158" width="7" height="14" fill="{ACC}"/>')
 
-    fy = 206
     for i, f in enumerate(cfg.get("facts", [])[:3]):
-        y = fy + i * 30
+        y = 204 + i * 30
         tone = f.get("tone")
         color = WARM if tone == "warm" else INK
         s.add(f'<g class="fu" style="animation-delay:{1.2 + i * .15:.2f}s">')
@@ -422,109 +431,137 @@ def render_header(cfg: dict, data: dict) -> str:
             vx += 14
         s.add(f'<text x="{vx}" y="{y}" font-family="{SANS}" font-size="13" fill="{color}">{esc(f["value"])}</text>')
         s.add("</g>")
-        s.hline(L, 462, y + 11, dash=True)
+        s.hline(L, L_END, y + 11, dash=True)
 
-    sx = L
     parts = []
     for i, item in enumerate(cfg.get("stack", [])):
         if i:
             parts.append(f'<tspan fill="{ACC}">  /  </tspan>')
         parts.append(f"<tspan>{esc(item)}</tspan>")
-    s.add(f'<text class="fi" style="animation-delay:1.8s" x="{sx}" y="306" font-family="{MONO}" font-size="11" fill="{DIM}">{"".join(parts)}</text>')
+    s.add(f'<text class="fi" style="animation-delay:1.8s" x="{L}" y="{BOT - 8}" font-family="{MONO}" font-size="11" fill="{DIM}">{"".join(parts)}</text>')
 
     # ---- readouts column
-    RX = 494
-    s.add(f'<path d="M{RX - 14},66 V312" stroke="{LINE2}"/>', f'<path d="M{RX + 154},66 V312" stroke="{LINE2}"/>')
+    s.add(f'<path d="M{D1},{TOP} V{BOT}" stroke="{LINE2}"/>', f'<path d="M{D2},{TOP} V{BOT}" stroke="{LINE2}"/>')
     weeks = [sum(d["count"] for d in days[i:i + 7]) for i in range(0, len(days), 7)][-20:]
     stats = [("CONTRIBUTIONS · 1Y", total), ("ACTIVE DAYS", active),
              ("PUBLIC REPOS", data["repos"]), ("STARS EARNED", data["stars"])]
+    row_h = (BOT - TOP) / 4
     for i, (label, val) in enumerate(stats):
-        y = 70 + i * 61
+        y = TOP + i * row_h
         s.add(f'<text x="{RX}" y="{y + 18}" font-family="{MONO}" font-size="9" letter-spacing="1.4" fill="{FAINT}">{label}</text>')
-        end = s.odometer(RX, y + 47, fmt(val), 24, INK, .5 + i * .15)
+        end = s.odometer(RX, y + 46, fmt(val), 24, INK, .5 + i * .15)
         if i == 0 and weeks:
             mx = max(weeks) or 1
-            gx0, gw, gh = max(end + 8, RX + 82), 54, 18
+            gw, gh = 44, 18
+            gx0 = R_END - gw
             step = gw / max(1, len(weeks) - 1)
-            pts = " ".join(f"{gx0 + j * step:.1f},{y + 47 - gh * v / mx:.1f}" for j, v in enumerate(weeks))
-            plen = gw * 2.2
+            pts = " ".join(f"{gx0 + j * step:.1f},{y + 46 - gh * v / mx:.1f}" for j, v in enumerate(weeks))
+            plen = gw * 2.4
             s.css.append(f".spark{{stroke-dasharray:{plen:.0f};animation:spark 2s ease-out 1s both}}@keyframes spark{{from{{stroke-dashoffset:{plen:.0f}}}to{{stroke-dashoffset:0}}}}")
             s.add(f'<polyline class="spark" points="{pts}" fill="none" stroke="{ACC}" stroke-width="1.5" stroke-linejoin="round"/>')
             lx, ly = pts.split()[-1].split(",")
             s.add(f'<circle class="ring" cx="{lx}" cy="{ly}" r="2" fill="none" stroke="{ACC}"/>',
                   f'<circle cx="{lx}" cy="{ly}" r="2" fill="{ACC}"/>')
         if i < 3:
-            s.hline(RX, RX + 140, y + 60)
+            s.hline(RX, R_END, y + row_h)
 
     # ---- portrait
-    s.add(render_portrait(s, 664, 62, 186, 250))
+    s.add(render_portrait(s, PX0, TOP, PW_, BOT - TOP))
     return s.render()
 
 
-def render_portrait(s: Svg, x0: float, y0: float, w: float, h: float) -> str:
-    out = []
-    clip = s.uid("pc")
-    s.defs.append(f'<clipPath id="{clip}"><rect x="{x0}" y="{y0}" width="{w}" height="{h}" rx="10"/></clipPath>')
-    glow = s.uid("pg")
-    s.defs.append(f'<radialGradient id="{glow}" cx=".5" cy=".42" r=".55"><stop offset="0" stop-color="{ACC}" stop-opacity=".16"/>'
-                  f'<stop offset="1" stop-color="{ACC}" stop-opacity="0"/></radialGradient>')
-    out.append(f'<rect x="{x0}" y="{y0}" width="{w}" height="{h}" rx="10" fill="{BG1}" stroke="{LINE2}"/>')
-    out.append(f'<rect x="{x0}" y="{y0}" width="{w}" height="{h}" rx="10" fill="url(#{glow})"/>')
-    out.append(f'<text x="{x0 + 12}" y="{y0 + 18}" font-family="{MONO}" font-size="8.5" letter-spacing="1.4" fill="{FAINT}">FIG. 0 — PORTRAIT</text>')
+def png_rgb(width: int, height: int, rows: list[bytes]) -> bytes:
+    """Minimal PNG encoder (8-bit RGB) so the Action needs no Pillow."""
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+    raw = b"".join(b"\x00" + r for r in rows)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
+
+def render_portrait(s: Svg, x0: float, y0: float, w: float, h: float) -> str:
+    """LED dot-matrix portrait: every cell is a dot, empty cells glow dimly, stars twinkle."""
+    out = [f'<rect x="{x0}" y="{y0}" width="{w}" height="{h}" rx="10" fill="#070a10" stroke="{LINE2}"/>',
+           f'<text x="{x0 + 12}" y="{y0 + 18}" font-family="{MONO}" font-size="8.5" letter-spacing="1.4" fill="{FAINT}">FIG. 0 — PORTRAIT</text>']
     path = ROOT / "avatar" / "pixels.json"
     if not path.exists():
         out.append(f'<text x="{x0 + w / 2}" y="{y0 + h / 2}" text-anchor="middle" font-family="{MONO}" font-size="10" fill="{DIM}">run make_avatar.py</text>')
         return "\n".join(out)
     av = json.loads(path.read_text())
-    cols, rows, px = av["cols"], av["rows"], av["pixels"]
-    cell = min((w - 14) / cols, (h - 34) / rows)
-    ox = x0 + (w - cols * cell) / 2
-    oy = y0 + h - rows * cell - 4
-    out.append(f'<text x="{x0 + w - 12}" y="{y0 + 18}" text-anchor="end" font-family="{MONO}" font-size="8.5" fill="{FAINT}">{cols}×{rows}</text>')
+    cols, prow, px = av["cols"], av["rows"], av["pixels"]
+    mx, mw = x0 + 8, w - 16
+    cell = mw / cols
+    rows = max(prow, int((h - 36) / cell))
+    mh = rows * cell
+    my = y0 + h - 8 - mh
+    off = rows - prow  # portrait sits on the bottom edge; empty rows above
+    out.append(f'<text x="{x0 + w - 12}" y="{y0 + 18}" text-anchor="end" font-family="{MONO}" font-size="8.5" fill="{FAINT}">{cols}×{rows} LED</text>')
 
-    # orbit behind the head
-    hx, hy = ox + cols * cell / 2, oy + rows * cell * 0.36
-    s.css.append(".orb{transform-box:view-box;animation:orb 14s linear infinite}"
-                 f".orb{{transform-origin:{hx:.1f}px {hy:.1f}px}}@keyframes orb{{to{{transform:rotate(360deg)}}}}")
-    out.append(f'<g clip-path="url(#{clip})"><circle cx="{hx:.1f}" cy="{hy:.1f}" r="{cols * cell * .6:.1f}" fill="none" stroke="{LINE2}" stroke-dasharray="1 5"/>'
-               f'<g class="orb"><circle cx="{hx:.1f}" cy="{hy - cols * cell * .6:.1f}" r="2.6" fill="{ACC}"/></g></g>')
+    def colour(r: int, c: int) -> str | None:
+        return px[r - off][c] if r >= off else None
 
-    # dots, revealed in rings from the centre
-    rings = 9
-    groups: list[list[str]] = [[] for _ in range(rings)]
-    cxm, cym = cols / 2, rows * 0.4
-    maxd = math.hypot(cols / 2, rows * 0.6)
-    rng = random.Random(3)
+    # the whole matrix as a tiny PNG, one pixel per dot
+    bg = (0x14, 0x1c, 0x2e)
+    png_rows = []
     for r in range(rows):
+        line = bytearray()
         for c in range(cols):
-            col = px[r][c]
-            if not col:
-                continue
-            L = lum(col)
-            if L < 0.12:  # lift near-black so hair and beard still read on the dark card
-                col = mix(col, "#46536a", 0.28)
-            rad = cell * (0.36 + 0.11 * min(1, L * 1.5)) * (0.95 + rng.random() * 0.08)
-            g = min(rings - 1, int(math.hypot(c - cxm, r - cym) / maxd * rings))
-            groups[g].append(f'<circle cx="{ox + c * cell + cell / 2:.1f}" cy="{oy + r * cell + cell / 2:.1f}" r="{rad:.2f}" fill="{col}"/>')
-    s.css.append(".dt{transform-box:fill-box;transform-origin:center;animation:dt .9s cubic-bezier(.2,.8,.2,1) both}"
-                 "@keyframes dt{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}")
-    for i, g in enumerate(groups):
-        if g:
-            out.append(f'<g class="dt" style="animation-delay:{.15 + i * .09:.2f}s">{"".join(g)}</g>')
+            col = colour(r, c)
+            line += bytes(int(col[i:i + 2], 16) for i in (1, 3, 5)) if col else bytes(bg)
+        png_rows.append(bytes(line))
+    b64 = base64.b64encode(png_rgb(cols, rows, png_rows)).decode()
 
-    # blink: skin-coloured dots flash over the eyes for a moment every few seconds
+    pat, mask, rv = s.uid("ledp"), s.uid("ledm"), s.uid("ledr")
+    s.defs.append(f'<pattern id="{pat}" x="{mx:.2f}" y="{my:.2f}" width="{cell:.3f}" height="{cell:.3f}" patternUnits="userSpaceOnUse">'
+                  f'<circle cx="{cell / 2:.3f}" cy="{cell / 2:.3f}" r="{cell * .41:.3f}" fill="#fff"/></pattern>'
+                  f'<mask id="{mask}" maskUnits="userSpaceOnUse" x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{mh:.2f}">'
+                  f'<rect x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{mh:.2f}" fill="url(#{pat})"/></mask>'
+                  f'<clipPath id="{rv}"><rect class="rv" x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{mh:.2f}"/></clipPath>')
+    s.css.append(f".rv{{transform-box:fill-box;transform-origin:50% 0;animation:rv 1.8s steps({rows}) .2s both}}"
+                 "@keyframes rv{from{transform:scaleY(0)}to{transform:scaleY(1)}}"
+                 f".head{{opacity:0;animation:head 1.8s steps({rows}) .2s both}}"
+                 f"@keyframes head{{0%{{opacity:1;transform:translateY(0)}}99%{{opacity:1}}100%{{opacity:0;transform:translateY({mh:.1f}px)}}}}"
+                 f".sweep{{opacity:0;animation:sweep 7s linear 3s infinite}}"
+                 f"@keyframes sweep{{0%{{opacity:.3;transform:translateY(0)}}40%{{opacity:.3;transform:translateY({mh:.1f}px)}}41%,100%{{opacity:0}}}}"
+                 ".tw{animation:tw 3s ease-in-out infinite}@keyframes tw{0%,100%{opacity:.12}50%{opacity:1}}"
+                 ".bl{opacity:0;animation:bl 5.5s steps(1) 2.6s infinite}@keyframes bl{0%{opacity:0}94%{opacity:1}97%{opacity:0}}")
+
+    layer = [f'<image href="data:image/png;base64,{b64}" x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{mh:.2f}" '
+             f'preserveAspectRatio="none" style="image-rendering:pixelated;image-rendering:crisp-edges"/>']
+
+    def cell_rect(r, c, fill, extra=""):
+        return f'<rect x="{mx + c * cell:.2f}" y="{my + r * cell:.2f}" width="{cell:.3f}" height="{cell:.3f}" fill="{fill}"{extra}/>'
+
+    # twinkling stars in the empty sky, away from the portrait edge
+    rng = random.Random(17)
+    palette = ["#ff7ab6", "#7ab8ff", "#ffd36e", "#ffffff", ACC, "#c39bff"]
+    def free(r, c, pad=1):
+        return all(0 <= rr < rows and 0 <= cc < cols and colour(rr, cc) is None
+                   for rr in range(r - pad, r + pad + 1) for cc in range(c - pad, c + pad + 1))
+    singles, sparkles = 0, 0
+    for _ in range(600):
+        if singles >= 26 and sparkles >= 4:
+            break
+        r, c = rng.randrange(1, rows - 1), rng.randrange(1, cols - 1)
+        col = rng.choice(palette)
+        style = f' class="tw" style="animation-duration:{rng.uniform(2, 5):.1f}s;animation-delay:{rng.uniform(0, 4):.1f}s"'
+        if sparkles < 4 and free(r, c, 2) and 2 <= r < rows - 2 and 2 <= c < cols - 2:
+            arms = "".join(cell_rect(r + dr, c + dc, col, ' fill-opacity=".55"') for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)))
+            layer.append(f'<g{style}>{cell_rect(r, c, "#ffffff")}{arms}</g>')
+            sparkles += 1
+        elif singles < 26 and free(r, c):
+            layer.append(cell_rect(r, c, col, style))
+            singles += 1
+
+    # blink: eyelid-coloured cells flash over the eyes every few seconds
     if av.get("blink"):
-        s.css.append(".bl{opacity:0;animation:bl 5.5s steps(1) 2.4s infinite}"
-                     "@keyframes bl{0%{opacity:0}94%{opacity:1}97%{opacity:0}}")
-        dots = "".join(
-            f'<circle cx="{ox + c * cell + cell / 2:.1f}" cy="{oy + r * cell + cell / 2:.1f}" r="{cell * .47:.2f}" fill="{colr}"/>'
-            for r, c, colr in av["blink"])
-        out.append(f'<g class="bl">{dots}</g>')
+        layer.append('<g class="bl">' + "".join(cell_rect(r + off, c, colr) for r, c, colr in av["blink"]) + "</g>")
 
-    # scan line
-    s.css.append(f".scan{{animation:scan 5s linear infinite}}@keyframes scan{{from{{transform:translateY(0)}}to{{transform:translateY({h}px)}}}}")
-    out.append(f'<g clip-path="url(#{clip})"><rect class="scan" x="{x0}" y="{y0 - 2}" width="{w}" height="2" fill="{ACC}" fill-opacity=".25"/></g>')
+    # print head during the reveal, then a slow light sweep
+    layer.append(f'<rect class="head" x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{cell:.3f}" fill="{MINT}"/>')
+    layer.append(f'<rect class="sweep" x="{mx:.2f}" y="{my:.2f}" width="{mw:.2f}" height="{cell:.3f}" fill="{MINT}"/>')
+
+    out.append(f'<g clip-path="url(#{rv})"><g mask="url(#{mask})">' + "".join(layer) + "</g></g>")
     return "\n".join(out)
 
 
@@ -540,7 +577,7 @@ def render_city(cfg: dict, data: dict) -> str:
     nweeks_all = max(1, math.ceil(len(days) / 7))
     s = Svg(W, H, f"Contribution city: {total} contributions in the last year", PAD)
     s.card(X0, Y0, CW, CH)
-    s.heading(40, 42, "FIG. 1", "Contribution city", "LAST 365 DAYS  ·  HEIGHT ∝ √CONTRIBUTIONS", X0 + CW - 26)
+    s.heading(IN_L, 42, "FIG. 1", "Contribution city", "LAST 365 DAYS  ·  HEIGHT ∝ √CONTRIBUTIONS", IN_R)
     s.hline(X0 + 1, X0 + CW - 1, 60)
 
     # ---- readout column
@@ -601,6 +638,8 @@ def render_city(cfg: dict, data: dict) -> str:
             continue
         seen.add(key)
         a, b = P(wi, 7.8), P(wi, 8.5)
+        if b[0] + 24 > IN_R:  # keep month labels inside the card padding
+            continue
         s.add(f'<path d="M{a[0]:.1f},{a[1]:.1f} L{b[0]:.1f},{b[1]:.1f}" stroke="{FAINT}"/>',
               f'<text x="{b[0] + 2:.1f}" y="{b[1] + 11:.1f}" font-family="{MONO}" font-size="8.5" letter-spacing=".8" fill="{FAINT}">{m:%b}</text>'.replace(m.strftime('%b'), m.strftime('%b').upper()))
 
@@ -689,7 +728,7 @@ def render_city(cfg: dict, data: dict) -> str:
         ly = max(84, py_ - 34)
         label = f"PEAK · {peak['count']}  {date.fromisoformat(peak['date']):%d %b}".upper()
         lw = tw(label, 9.5, True) + 16
-        lx = min(px_ - 8, X0 + CW - 24 - lw)
+        lx = min(px_ - 8, IN_R - lw)
         s.add(f'<g class="fi" style="animation-delay:2.2s"><path d="M{px_:.1f},{py_:.1f} V{ly + 6:.1f}" stroke="{WARM}" stroke-dasharray="2 2"/>'
               f'<circle cx="{px_:.1f}" cy="{py_:.1f}" r="2" fill="{WARM}"/>'
               f'<rect x="{lx:.1f}" y="{ly - 12:.1f}" width="{lw:.1f}" height="18" rx="3" fill="{BG0}" stroke="{WARM}" stroke-opacity=".6"/>'
@@ -701,7 +740,7 @@ def render_city(cfg: dict, data: dict) -> str:
               f'<text x="{bx:.1f}" y="{by - 10:.1f}" text-anchor="middle" font-family="{MONO}" font-size="8.5" letter-spacing=".8" fill="{ACC}">TODAY</text>')
 
     # legend
-    lx = X0 + CW - 172
+    lx = IN_R - 138
     s.add(f'<text x="{lx}" y="400" font-family="{MONO}" font-size="8.5" letter-spacing="1" fill="{FAINT}">LESS</text>')
     for i, c in enumerate(CITY_LEVELS):
         s.add(f'<rect x="{lx + 32 + i * 16}" y="391" width="11" height="11" rx="2" fill="{c}"/>')
@@ -717,15 +756,15 @@ def render_panels(cfg: dict, data: dict) -> str:
     # ---- language stack card
     X0, Y0, LW, CH = 10, 10, 292, 410
     s.card(X0, Y0, LW, CH)
-    s.heading(X0 + 26, 42, "FIG. 2", "Language stack")
+    s.heading(IN_L, 42, "FIG. 2", "Language stack")
     s.hline(X0 + 1, X0 + LW - 1, 60)
-    s.add(f'<text x="{X0 + 26}" y="84" font-family="{MONO}" font-size="9" letter-spacing="1.4" fill="{FAINT}">BYTES OF CODE · PUBLIC REPOS</text>')
+    s.add(f'<text x="{IN_L}" y="84" font-family="{MONO}" font-size="9" letter-spacing="1.4" fill="{FAINT}">BYTES OF CODE · PUBLIC REPOS</text>')
 
     excl = set(cfg.get("exclude_languages", []))
     langs = sorted(((n, b) for n, b in data["lang_bytes"].items() if n not in excl), key=lambda t: -t[1])
     langs = langs[: cfg.get("top_languages", 5)]
     tot = sum(b for _, b in langs) or 1
-    bx, bwid = X0 + 26, LW - 52
+    bx, bwid = IN_L, LW - 60
     clip = s.uid("lb")
     s.defs.append(f'<clipPath id="{clip}"><rect class="gx" style="animation-delay:.3s" x="{bx}" y="96" width="{bwid}" height="10" rx="3"/></clipPath>')
     segs, cx = [], bx
@@ -736,8 +775,9 @@ def render_panels(cfg: dict, data: dict) -> str:
         cx += wseg
     s.add(f'<g clip-path="url(#{clip})">{"".join(segs)}</g>')
 
+    step = min(50, (318 - 146) / max(1, len(langs) - 1))
     for i, (n, b) in enumerate(langs):
-        y = 146 + i * 50
+        y = 146 + i * step
         pct = 100 * b / tot
         color = data["lang_color"].get(n) or LANG_FALLBACK.get(n, ACC)
         s.add(f'<g class="fu" style="animation-delay:{.4 + i * .1:.2f}s">'
@@ -747,22 +787,29 @@ def render_panels(cfg: dict, data: dict) -> str:
               f'<text x="{bx + 16}" y="{y + 15}" font-family="{MONO}" font-size="9" fill="{FAINT}">{size_str(b)}</text>'
               f'<rect x="{bx}" y="{y + 22}" width="{bwid}" height="3" rx="1.5" fill="{BG1}"/>'
               f'<rect class="gx" style="animation-delay:{.6 + i * .1:.2f}s" x="{bx}" y="{y + 22}" width="{max(3, bwid * pct / 100):.1f}" height="3" rx="1.5" fill="{color}"/></g>')
-    if excl:
-        s.add(f'<text x="{bx}" y="{Y0 + CH - 16}" font-family="{MONO}" font-size="8.5" fill="{FAINT}">markup &amp; config excluded</text>')
+    # summary readouts along the bottom, aligned with the project cards' bottom edge
+    s.hline(bx, bx + bwid, 344)
+    summary = [("CODE", size_str(tot)), ("LANGUAGES", str(len(langs))), ("REPOS", str(data["repos"]))]
+    colw = bwid / 3
+    for i, (k, v) in enumerate(summary):
+        sx = bx + i * colw
+        s.add(f'<text x="{sx:.1f}" y="366" font-family="{MONO}" font-size="8.5" letter-spacing="1.4" fill="{FAINT}">{k}</text>'
+              f'<text x="{sx:.1f}" y="390" font-family="{MONO}" font-size="15" font-weight="700" fill="{INK}">{esc(v)}</text>')
 
     # ---- selected work card
-    PX = X0 + LW + 8
+    PX = X0 + LW + GAP
     PW = W - 10 - PX
     s.card(PX, Y0, PW, CH)
-    s.heading(PX + 26, 42, "TABLE 1", "Selected work", "./projects.sh --featured", PX + PW - 26)
+    s.heading(PX + 30, 42, "TABLE 1", "Selected work", "./projects.sh --featured", PX + PW - 30)
     s.hline(PX + 1, PX + PW - 1, 60)
 
     gap = 10
-    cw = (PW - 52 - gap) / 2
-    chh = (CH - 50 - 26 - gap) / 2
+    top, bottom = 80, Y0 + CH - 20  # 20 px under the heading rule, 20 px above the card edge
+    cw = (PW - 60 - gap) / 2
+    chh = (bottom - top - gap) / 2
     for i, p in enumerate(data["featured"][:4]):
-        cx = PX + 26 + (i % 2) * (cw + gap)
-        cy = 80 + (i // 2) * (chh + gap)
+        cx = PX + 30 + (i % 2) * (cw + gap)
+        cy = top + (i // 2) * (chh + gap)
         s.add(f'<g class="fu" style="animation-delay:{.3 + i * .14:.2f}s">')
         s.add(f'<rect x="{cx:.1f}" y="{cy:.1f}" width="{cw:.1f}" height="{chh:.1f}" rx="10" fill="{BG1}" stroke="{LINE2}"/>')
         s.add(f'<text x="{cx + 16:.1f}" y="{cy + 24:.1f}" font-family="{MONO}" font-size="9.5" letter-spacing="1.2" fill="{FAINT}">{i + 1:02d}</text>')
@@ -792,15 +839,21 @@ def render_panels(cfg: dict, data: dict) -> str:
 
 
 # ------------------------------------------------------------------ link buttons
-def render_button(label: str, idx: int) -> str:
-    W, H = 200, 46
-    s = Svg(W, H, label.title())
-    s.add(f'<rect x="1" y="1" width="{W - 2}" height="{H - 2}" rx="10" fill="{BG0}" stroke="{LINE2}"/>',
-          f'<path d="M5,15 V5 H15" fill="none" stroke="{ACC}" stroke-width="1.5"/>',
-          f'<path d="M{W - 5},{H - 15} V{H - 5} H{W - 15}" fill="none" stroke="{ACC}" stroke-width="1.5"/>',
-          f'<text x="20" y="28" font-family="{MONO}" font-size="9.5" fill="{FAINT}">{idx:02d}</text>',
-          f'<text x="44" y="28" font-family="{MONO}" font-size="12" letter-spacing="1.6" fill="{INK}">{esc(label)}</text>',
-          f'<text x="{W - 20}" y="28" text-anchor="end" font-family="{MONO}" font-size="13" fill="{ACC}">↗</text>')
+def render_button(label: str, idx: int, n: int) -> str:
+    """One of n buttons shown side by side at 100/n % width each, with no whitespace
+    between them in the README. Insets differ per button so the row lines up with
+    the card edges (x 10..870 of 880) and the gaps between buttons equal GAP."""
+    W, H = 880 / n, 54
+    bw = (860 - (n - 1) * GAP) / n
+    x = 10 + (idx - 1) * (bw + GAP) - (idx - 1) * W
+    y, bh = 6, 42
+    s = Svg(round(W), H, label.title())
+    s.add(f'<rect x="{x:.1f}" y="{y}" width="{bw:.1f}" height="{bh}" rx="10" fill="{BG0}" stroke="{LINE2}"/>',
+          f'<path d="M{x + 4:.1f},{y + 14} V{y + 4} H{x + 14:.1f}" fill="none" stroke="{ACC}" stroke-width="1.5"/>',
+          f'<path d="M{x + bw - 4:.1f},{y + bh - 14} V{y + bh - 4} H{x + bw - 14:.1f}" fill="none" stroke="{ACC}" stroke-width="1.5"/>',
+          f'<text x="{x + 20:.1f}" y="{y + 25}" font-family="{MONO}" font-size="9.5" fill="{FAINT}">{idx:02d}</text>',
+          f'<text x="{x + 44:.1f}" y="{y + 25}" font-family="{MONO}" font-size="12" letter-spacing="1.6" fill="{INK}">{esc(label)}</text>',
+          f'<text x="{x + bw - 20:.1f}" y="{y + 25}" text-anchor="end" font-family="{MONO}" font-size="13" fill="{ACC}">↗</text>')
     return s.render()
 
 
@@ -824,8 +877,9 @@ def main() -> None:
     out_dir.mkdir(exist_ok=True)
     outputs = {"header.svg": render_header(cfg, data), "city.svg": render_city(cfg, data),
                "panels.svg": render_panels(cfg, data)}
-    for i, link in enumerate(cfg.get("links", []), 1):
-        outputs[f"btn-{link['label'].lower()}.svg"] = render_button(link["label"], i)
+    links = cfg.get("links", [])
+    for i, link in enumerate(links, 1):
+        outputs[f"btn-{link['label'].lower()}.svg"] = render_button(link["label"], i, len(links))
     for name, svg in outputs.items():
         (out_dir / name).write_text(svg, encoding="utf-8")
         print(f"wrote {out_dir.name}/{name}")

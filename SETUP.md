@@ -65,7 +65,15 @@ The default `GITHUB_TOKEN` only sees public activity.
 
 ## Avatar
 
-The header portrait is a vector illustration (`avatar/portrait.svg`, rendered to `avatar/portrait.png`) converted into a 48 x 60 dot halftone. It ripples in from the centre and blinks every few seconds.
+The header portrait is an LED dot matrix: every cell is a dot, empty cells glow dimly and coloured stars twinkle around the head. It prints in line by line, blinks every few seconds and a soft light sweeps over it.
+
+The picture comes from `avatar/portrait.svg`, a flat cel-shaded illustration with one-dot outlines. `avatar/portrait.png` is that SVG rendered at 4x, and `scripts/make_avatar.py` turns it into `avatar/pixels.json` (64 x 77 dots). Each dot takes the dominant flat colour of its cell, so edges stay crisp.
+
+After editing the SVG, re-render the PNG (any SVG renderer at 1000 x 1204 px) and run:
+
+```bash
+python scripts/make_avatar.py
+```
 
 Use your own photo instead:
 
@@ -74,16 +82,20 @@ pip install pillow
 ```
 
 ```bash
-python scripts/make_avatar.py path/to/photo.png --eyes 0.38,0.45,0.62,0.45
+python scripts/make_avatar.py path/to/photo.png --style photo --eyes 0.38,0.45,0.62,0.45
 ```
 
 `--eyes` is optional: the normalised x,y of each eye centre, used for the blink. A transparent PNG cut-out works best. Commit `avatar/pixels.json` and the Action re-renders the header.
 
-Go back to the illustration:
+## Spacing
 
-```bash
-python scripts/make_avatar.py
-```
+Every card follows one grid, set at the top of `scripts/generate.py`:
+
+| Constant | Meaning |
+| --- | --- |
+| `GAP` | space between neighbouring cards and link buttons (~10 px on GitHub) |
+| `PAD` | transparent margin above and below each card; controls the vertical gap |
+| `IN_L`, `IN_R` | inner content edges shared by every card (30 px padding) |
 
 ## Preview locally
 
