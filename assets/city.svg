@@ -37,7 +37,7 @@
 <path d="M40,203 H236" stroke="#263243" stroke-dasharray="2 4"/>
 <g class="fu" style="animation-delay:0.70s"><text x="40" y="220" font-family="-apple-system, 'Segoe UI', Ubuntu, 'Helvetica Neue', Arial, sans-serif" font-size="12.5" fill="#8794a5">peak day</text><text x="236" y="220" text-anchor="end" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="12.5" fill="#e8edf2">98</text></g>
 <path d="M40,229 H236" stroke="#263243" stroke-dasharray="2 4"/>
-<g class="fu" style="animation-delay:0.80s"><text x="40" y="246" font-family="-apple-system, 'Segoe UI', Ubuntu, 'Helvetica Neue', Arial, sans-serif" font-size="12.5" fill="#8794a5">current streak</text><text x="236" y="246" text-anchor="end" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="12.5" fill="#e8edf2">5d</text></g>
+<g class="fu" style="animation-delay:0.80s"><text x="40" y="246" font-family="-apple-system, 'Segoe UI', Ubuntu, 'Helvetica Neue', Arial, sans-serif" font-size="12.5" fill="#8794a5">current streak</text><text x="236" y="246" text-anchor="end" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="12.5" fill="#e8edf2">0d</text></g>
 <path d="M40,255 H236" stroke="#263243" stroke-dasharray="2 4"/>
 <g class="fu" style="animation-delay:0.90s"><text x="40" y="272" font-family="-apple-system, 'Segoe UI', Ubuntu, 'Helvetica Neue', Arial, sans-serif" font-size="12.5" fill="#8794a5">longest streak</text><text x="236" y="272" text-anchor="end" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="12.5" fill="#e8edf2">8d</text></g>
 <path d="M40,281 H236" stroke="#263243" stroke-dasharray="2 4"/>
@@ -94,6 +94,7 @@
 <polygon points="783.7,171.6 790.6,169.5 795.1,172.2 788.2,174.3" fill="#11242c"/>
 <polygon points="759.0,173.6 765.9,171.5 770.4,174.2 763.5,176.3" fill="#11242c"/>
 <polygon points="774.4,174.5 781.3,172.4 785.8,175.1 778.9,177.2" fill="#11242c"/>
+<polygon points="789.8,175.3 796.7,173.2 801.2,175.9 794.3,178.0" fill="#11242c"/>
 <polygon points="749.7,176.5 756.6,174.4 761.1,177.1 754.2,179.2" fill="#11242c"/>
 <polygon points="765.1,177.3 772.0,175.2 776.5,177.9 769.6,180.0" fill="#11242c"/>
 <polygon points="780.5,178.2 787.4,176.1 791.9,178.8 785.0,180.9" fill="#11242c"/>
@@ -481,9 +482,9 @@
 <polygon points="330.6,338.3 337.5,336.2 342.0,338.9 335.1,341.0" fill="#11242c"/>
 <g class="beam"><polygon points="287.1,193.0 339.6,224.9 339.6,344.9 287.1,313.0" fill="url(#beam27)"/><polygon points="281.5,314.8 292.7,311.3 345.2,343.2 334.0,346.6" fill="#3ee6c1" fill-opacity=".16"/><path d="M287.1,313.0 L339.6,344.9" stroke="#3ee6c1" stroke-opacity=".7"/></g>
 <g class="fi" style="animation-delay:2.2s"><path d="M411.0,212.0 V184.0" stroke="#ffb454" stroke-dasharray="2 2"/><circle cx="411.0" cy="212.0" r="2" fill="#ffb454"/><rect x="403.0" y="166.0" width="112.9" height="18" rx="3" fill="#080b10" stroke="#ffb454" stroke-opacity=".6"/><text x="411.0" y="179.0" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="9.5" letter-spacing=".8" fill="#ffb454">PEAK · 98  21 JAN</text></g>
-<circle class="ring" cx="789.4" cy="171.9" r="3" fill="none" stroke="#3ee6c1"/>
-<circle cx="789.4" cy="171.9" r="2.5" fill="#3ee6c1"/>
-<text x="789.4" y="161.9" text-anchor="middle" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="8.5" letter-spacing=".8" fill="#3ee6c1">TODAY</text>
+<circle class="ring" cx="795.5" cy="175.6" r="3" fill="none" stroke="#3ee6c1"/>
+<circle cx="795.5" cy="175.6" r="2.5" fill="#3ee6c1"/>
+<text x="795.5" y="165.6" text-anchor="middle" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="8.5" letter-spacing=".8" fill="#3ee6c1">TODAY</text>
 <text x="702" y="400" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="8.5" letter-spacing="1" fill="#4f5b6b">LESS</text>
 <rect x="734" y="391" width="11" height="11" rx="2" fill="#11242c"/>
 <rect x="750" y="391" width="11" height="11" rx="2" fill="#0e5a50"/>
