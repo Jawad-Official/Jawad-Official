@@ -98,6 +98,7 @@
 <polygon points="749.7,176.5 756.6,174.4 761.1,177.1 754.2,179.2" fill="#11242c"/>
 <polygon points="765.1,177.3 772.0,175.2 776.5,177.9 769.6,180.0" fill="#11242c"/>
 <polygon points="780.5,178.2 787.4,176.1 791.9,178.8 785.0,180.9" fill="#11242c"/>
+<polygon points="795.9,179.0 802.8,176.9 807.3,179.6 800.4,181.7" fill="#11242c"/>
 <g class="gy" style="animation-delay:1.26s"><polygon points="740.4,179.3 744.9,182.0 744.9,143.0 740.4,140.3" fill="#084a41"/><polygon points="744.9,182.0 751.8,179.9 751.8,140.9 744.9,143.0" fill="#0c6a5d"/><polygon points="740.4,140.3 747.3,138.2 751.8,140.9 744.9,143.0" fill="#119482"/><rect class="win" style="animation-duration:4.4s;animation-delay:3.8s" x="746.0" y="155.6" width="2" height="1.6" fill="#fff1c1"/><polygon points="740.4,140.3 747.3,138.2 751.8,140.9 744.9,143.0" fill="#ffffff" class="sh" style="animation-delay:10.49s"/></g>
 <circle class="pt" style="animation-delay:6.2s;animation-duration:3.0s" cx="745.9" cy="140.6" r="1.3" fill="#a5fbe6"/>
 <circle class="pt" style="animation-delay:3.6s;animation-duration:3.8s" cx="746.5" cy="140.6" r="1.3" fill="#a5fbe6"/>
@@ -482,9 +483,9 @@
 <polygon points="330.6,338.3 337.5,336.2 342.0,338.9 335.1,341.0" fill="#11242c"/>
 <g class="beam"><polygon points="287.1,193.0 339.6,224.9 339.6,344.9 287.1,313.0" fill="url(#beam27)"/><polygon points="281.5,314.8 292.7,311.3 345.2,343.2 334.0,346.6" fill="#3ee6c1" fill-opacity=".16"/><path d="M287.1,313.0 L339.6,344.9" stroke="#3ee6c1" stroke-opacity=".7"/></g>
 <g class="fi" style="animation-delay:2.2s"><path d="M411.0,212.0 V184.0" stroke="#ffb454" stroke-dasharray="2 2"/><circle cx="411.0" cy="212.0" r="2" fill="#ffb454"/><rect x="403.0" y="166.0" width="112.9" height="18" rx="3" fill="#080b10" stroke="#ffb454" stroke-opacity=".6"/><text x="411.0" y="179.0" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="9.5" letter-spacing=".8" fill="#ffb454">PEAK · 98  21 JAN</text></g>
-<circle class="ring" cx="795.5" cy="175.6" r="3" fill="none" stroke="#3ee6c1"/>
-<circle cx="795.5" cy="175.6" r="2.5" fill="#3ee6c1"/>
-<text x="795.5" y="165.6" text-anchor="middle" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="8.5" letter-spacing=".8" fill="#3ee6c1">TODAY</text>
+<circle class="ring" cx="801.6" cy="179.3" r="3" fill="none" stroke="#3ee6c1"/>
+<circle cx="801.6" cy="179.3" r="2.5" fill="#3ee6c1"/>
+<text x="801.6" y="169.3" text-anchor="middle" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="8.5" letter-spacing=".8" fill="#3ee6c1">TODAY</text>
 <text x="702" y="400" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="8.5" letter-spacing="1" fill="#4f5b6b">LESS</text>
 <rect x="734" y="391" width="11" height="11" rx="2" fill="#11242c"/>
 <rect x="750" y="391" width="11" height="11" rx="2" fill="#0e5a50"/>
