@@ -120,6 +120,7 @@
 <polygon points="768.0,187.6 774.9,185.5 779.4,188.2 772.5,190.3" fill="#11242c"/>
 <polygon points="783.4,188.4 790.3,186.3 794.8,189.0 787.9,191.1" fill="#11242c"/>
 <g class="gy" style="animation-delay:1.32s"><polygon points="798.8,189.3 803.3,192.0 803.3,180.5 798.8,177.8" fill="#072d28"/><polygon points="803.3,192.0 810.2,189.9 810.2,178.4 803.3,180.5" fill="#0a4039"/><polygon points="798.8,177.8 805.7,175.7 810.2,178.4 803.3,180.5" fill="#0e5a50"/><polygon points="798.8,177.8 805.7,175.7 810.2,178.4 803.3,180.5" fill="#ffffff" class="sh" style="animation-delay:10.97s"/></g>
+<polygon points="814.2,190.1 821.1,188.0 825.6,190.7 818.7,192.8" fill="#11242c"/>
 <polygon points="712.5,187.9 719.4,185.8 723.9,188.5 717.0,190.6" fill="#11242c"/>
 <polygon points="727.9,188.7 734.8,186.6 739.3,189.3 732.4,191.4" fill="#11242c"/>
 <g class="gy" style="animation-delay:1.23s"><polygon points="743.3,189.6 747.8,192.3 747.8,165.3 743.3,162.6" fill="#084a41"/><polygon points="747.8,192.3 754.7,190.2 754.7,163.2 747.8,165.3" fill="#0c6a5d"/><polygon points="743.3,162.6 750.2,160.5 754.7,163.2 747.8,165.3" fill="#119482"/><rect class="win" style="animation-duration:2.8s;animation-delay:1.2s" x="748.9" y="183.9" width="2" height="1.6" fill="#fff1c1"/><rect class="win" style="animation-duration:5.2s;animation-delay:1.4s" x="748.9" y="174.9" width="2" height="1.6" fill="#fff1c1"/><rect class="win" style="animation-duration:5.8s;animation-delay:1.9s" x="751.6" y="174.0" width="2" height="1.6" fill="#fff1c1"/><polygon points="743.3,162.6 750.2,160.5 754.7,163.2 747.8,165.3" fill="#ffffff" class="sh" style="animation-delay:10.34s"/></g>
@@ -485,9 +486,9 @@
 <polygon points="330.6,338.3 337.5,336.2 342.0,338.9 335.1,341.0" fill="#11242c"/>
 <g class="beam"><polygon points="287.1,193.0 339.6,224.9 339.6,344.9 287.1,313.0" fill="url(#beam27)"/><polygon points="281.5,314.8 292.7,311.3 345.2,343.2 334.0,346.6" fill="#3ee6c1" fill-opacity=".16"/><path d="M287.1,313.0 L339.6,344.9" stroke="#3ee6c1" stroke-opacity=".7"/></g>
 <g class="fi" style="animation-delay:2.2s"><path d="M411.0,212.0 V184.0" stroke="#ffb454" stroke-dasharray="2 2"/><circle cx="411.0" cy="212.0" r="2" fill="#ffb454"/><rect x="403.0" y="166.0" width="112.9" height="18" rx="3" fill="#080b10" stroke="#ffb454" stroke-opacity=".6"/><text x="411.0" y="179.0" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="9.5" letter-spacing=".8" fill="#ffb454">PEAK · 98  21 JAN</text></g>
-<circle class="ring" cx="813.8" cy="186.7" r="3" fill="none" stroke="#3ee6c1"/>
-<circle cx="813.8" cy="186.7" r="2.5" fill="#3ee6c1"/>
-<text x="813.8" y="176.7" text-anchor="middle" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="8.5" letter-spacing=".8" fill="#3ee6c1">TODAY</text>
+<circle class="ring" cx="819.9" cy="190.4" r="3" fill="none" stroke="#3ee6c1"/>
+<circle cx="819.9" cy="190.4" r="2.5" fill="#3ee6c1"/>
+<text x="819.9" y="180.4" text-anchor="middle" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="8.5" letter-spacing=".8" fill="#3ee6c1">TODAY</text>
 <text x="702" y="400" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="8.5" letter-spacing="1" fill="#4f5b6b">LESS</text>
 <rect x="734" y="391" width="11" height="11" rx="2" fill="#11242c"/>
 <rect x="750" y="391" width="11" height="11" rx="2" fill="#0e5a50"/>
